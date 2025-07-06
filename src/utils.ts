@@ -1,5 +1,7 @@
 import { WebDAVNamespace, WebDAVPropName, WebDAVResourceType } from './constants';
-import { Stats, Dirent, WebDAVError } from './types';
+import { Stats } from './types';
+import { Dirent } from 'fs';
+import { WebDAVError } from './WebDAVError';
 
 /**
  * 规范化路径，确保以 / 开头，不以 / 结尾（除非是根路径）
@@ -137,7 +139,7 @@ export function parseWebDAVProperties(xml: Document): Record<string, any> {
           result.size = parseInt(element.textContent || '0', 10);
         } else if (localName === WebDAVPropName.GET_LAST_MODIFIED) {
           // 最后修改时间
-          result.modifiedAt = new Date(element.textContent || '');
+          result.lastModified = new Date(element.textContent || '');
         } else if (localName === WebDAVPropName.CREATION_DATE) {
           // 创建时间
           result.createdAt = new Date(element.textContent || '');
@@ -277,33 +279,12 @@ export function propertiesToStats(href: string, properties: Record<string, any>)
     isFile: !isDirectory,
     size: properties.size || 0,
     createdAt: properties.createdAt || new Date(),
-    modifiedAt: properties.modifiedAt || new Date(),
+    lastModified: properties.modifiedAt || new Date(),
     name,
     path: href,
     mimeType: properties.mimeType,
     etag: properties.etag,
     ...properties,
-  };
-}
-
-/**
- * 将 WebDAV 属性转换为 Dirent 对象
- * @param href 资源路径
- * @param properties 属性
- * @returns Dirent 对象
- */
-export function propertiesToDirent(href: string, properties: Record<string, any>): Dirent {
-  const name = getBasename(href);
-  const isDirectory = properties.resourceType === WebDAVResourceType.DIRECTORY;
-  
-  return {
-    name,
-    isDirectory,
-    isFile: !isDirectory,
-    size: properties.size,
-    modifiedAt: properties.modifiedAt,
-    mimeType: properties.mimeType,
-    etag: properties.etag,
   };
 }
 
@@ -324,9 +305,8 @@ export function parseXml(xmlString: string): Document {
       const { DOMParser } = require('xmldom');
       return new DOMParser().parseFromString(xmlString, 'application/xml');
     } catch (error) {
-      throw new WebDAVError('无法解析 XML。在 Node.js 环境中，请安装 xmldom 包。', {
-        originalError: error as Error,
-      });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new WebDAVError(`无法解析 XML: ${errorMessage}。在 Node.js 环境中，请安装 xmldom 包。`);
     }
   } else {
     throw new WebDAVError('无法解析 XML。未找到 XML 解析器。');
@@ -430,4 +410,15 @@ export async function toArrayBuffer(data: string | ArrayBuffer | Blob): Promise<
  * @param encoding 编码
  * @returns 字符串
  */
-export function arrayBufferToString(buffer: Array
+export function arrayBufferToString(buffer: ArrayBuffer, encoding: string = 'utf-8'): string {
+  if (typeof TextDecoder !== 'undefined') {
+    // 浏览器环境
+    const decoder = new TextDecoder(encoding);
+    return decoder.decode(buffer);
+  } else if (typeof Buffer !== 'undefined') {
+    // Node.js 环境
+    return Buffer.from(buffer).toString(encoding as BufferEncoding);
+  } else {
+    throw new WebDAVError('无法将 ArrayBuffer 转换为字符串，当前环境不支持 TextDecoder 或 Buffer');
+  }
+}

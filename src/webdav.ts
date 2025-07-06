@@ -2,9 +2,9 @@
  * WebDAV 文件系统实现
  */
 
-import { FileSystem, FileSystemError, FileSystemErrorCode } from 'zen-fs';
+import { FileSystem, FileSystemError, FileSystemErrorCode } from '@zenfs/core';
 import { WebDAVOptions, WebDAVFileSystem, WebDAVStat } from './types';
-import { parseXML, buildPropfindRequest, buildProppatchRequest } from './utils';
+import { parseXml as parseXML, createPropfindXml as buildPropfindRequest, createProppatchXml as buildProppatchRequest } from './utils';
 
 /**
  * 创建 WebDAV 文件系统

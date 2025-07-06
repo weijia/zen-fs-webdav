@@ -121,6 +121,26 @@ export interface Stats {
    * 创建时间
    */
   createdAt?: Date;
+  
+  /**
+   * 文件或目录名称
+   */
+  name: string;
+  
+  /**
+   * 文件或目录的完整路径
+   */
+  path: string;
+  
+  /**
+   * 文件的 MIME 类型
+   */
+  mimeType?: string;
+  
+  /**
+   * 文件的 ETag
+   */
+  etag?: string;
 }
 
 /**
@@ -211,4 +231,29 @@ export interface MoveOptions {
    * 是否覆盖目标位置的现有文件
    */
   overwrite?: boolean;
+}
+
+/**
+ * WebDAV操作结果
+ */
+export interface WebDAVResult {
+  /**
+   * 操作是否成功
+   */
+  success: boolean;
+  
+  /**
+   * HTTP状态码
+   */
+  statusCode: number;
+  
+  /**
+   * 操作结果消息（可选）
+   */
+  message?: string;
+  
+  /**
+   * 操作返回的数据（可选）
+   */
+  data?: any;
 }

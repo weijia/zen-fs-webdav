@@ -4,14 +4,15 @@
 
 import {
   WebDAVOptions,
-  WebDAVFileSystem,
-  FileStat,
+  Stats,
   ReadFileOptions,
   WriteFileOptions,
-  ReadDirOptions,
+  ReaddirOptions,
   MkdirOptions,
   WebDAVResult,
 } from './types';
+
+import { WebDAVFileSystem } from './WebDAVFileSystem';
 
 import {
   WebDAVError,
@@ -21,14 +22,13 @@ import {
   FileExistsError,
   NetworkError,
   TimeoutError,
-  InvalidArgumentError,
+  ArgumentError,
   ServerError,
-  createErrorFromStatusCode,
 } from './errors';
 
 import {
   normalizePath,
-  joinUrl,
+  joinPaths as joinUrl,
   getFilenameFromPath,
   getDirFromPath,
   parseWebDAVXml,
@@ -54,7 +54,7 @@ export class WebDAVFS implements WebDAVFileSystem {
    */
   constructor(options: WebDAVOptions) {
     if (!options.baseUrl) {
-      throw new InvalidArgumentError('必须提供baseUrl');
+      throw new ArgumentError('必须提供baseUrl');
     }
 
     this.baseUrl = options.baseUrl.endsWith('/') 
@@ -169,7 +169,18 @@ export class WebDAVFS implements WebDAVFileSystem {
    * @param error 原始错误
    */
   private handleResponseError(status: number, path: string, error?: Error): never {
-    throw createErrorFromStatusCode(status, undefined, path, error);
+    switch (status) {
+      case 401:
+        throw new AuthenticationError(`认证失败: ${path}`, undefined, error);
+      case 403:
+        throw new AuthorizationError(`无权限访问: ${path}`, undefined, error);
+      case 404:
+        throw new NotFoundError(`资源不存在: ${path}`, undefined, error);
+      case 409:
+        throw new FileExistsError(`资源已存在: ${path}`, undefined, error);
+      default:
+        throw new ServerError(`服务器错误 (${status}): ${path}`, undefined, error);
+    }
   }
 
   /**
@@ -290,7 +301,7 @@ export class WebDAVFS implements WebDAVFileSystem {
       // 确保是文件而不是目录
       const stat = await this.stat(normalizedPath);
       if (stat.isDirectory) {
-        throw new InvalidArgumentError(`路径指向一个目录，请使用rmdir方法: ${normalizedPath}`);
+        throw new ArgumentError(`路径指向一个目录，请使用rmdir方法: ${normalizedPath}`);
       }
       
       const response = await this.request('DELETE', normalizedPath);
@@ -324,7 +335,7 @@ export class WebDAVFS implements WebDAVFileSystem {
    * @param options 读取选项
    * @returns 文件统计信息数组
    */
-  async readDir(path: string, options: ReadDirOptions = {}): Promise<FileStat[]> {
+  async readDir(path: string, options: ReaddirOptions = {}): Promise<Stats[]> {
     const normalizedPath = normalizePath(path);
     const cacheKey = `readDir:${normalizedPath}`;
     
@@ -461,7 +472,7 @@ export class WebDAVFS implements WebDAVFileSystem {
       // 确保是目录而不是文件
       const stat = await this.stat(normalizedPath);
       if (!stat.isDirectory) {
-        throw new InvalidArgumentError(`路径指向一个文件，请使用deleteFile方法: ${normalizedPath}`);
+        throw new ArgumentError(`路径指向一个文件，请使用deleteFile方法: ${normalizedPath}`);
       }
       
       // 如果是递归删除，需要先删除所有子文件和子目录
@@ -512,7 +523,7 @@ export class WebDAVFS implements WebDAVFileSystem {
    * @param path 文件或目录路径
    * @returns 文件统计信息
    */
-  async stat(path: string): Promise<FileStat> {
+  async stat(path: string): Promise<Stats> {
     const normalizedPath = normalizePath(path);
     const cacheKey = `stat:${normalizedPath}`;
     

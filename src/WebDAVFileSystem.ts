@@ -13,6 +13,49 @@ import {
   MoveOptions,
 } from './types';
 
+// 浏览器环境类型
+declare const DOMParser: {
+  new (): {
+    parseFromString(str: string, type: string): Document;
+  };
+};
+
+declare const btoa: (str: string) => string;
+
+/**
+ * WebDAV 文件系统实现
+ */
+export class WebDAVFileSystem {
+  private baseUrl: string;
+  private username?: string;
+  private password?: string;
+  private token?: string;
+  private defaultHeaders: Record<string, string>;
+  private timeout: number;
+
+  constructor(options: WebDAVOptions) {
+    this.baseUrl = options.baseUrl.endsWith('/') 
+      ? options.baseUrl 
+      : `${options.baseUrl}/`;
+    
+    this.username = options.username;
+    this.password = options.password;
+    this.token = options.token;
+    this.timeout = options.timeout || 30000;
+    
+    this.defaultHeaders = {
+      'Content-Type': 'application/octet-stream',
+      ...options.headers,
+    };
+    
+    if (this.token) {
+      this.defaultHeaders['Authorization'] = `Bearer ${this.token}`;
+    } else if (this.username && this.password) {
+      const credentials = btoa(`${this.username}:${this.password}`);
+      this.defaultHeaders['Authorization'] = `Basic ${credentials}`;
+    }
+  }
+
   /**
    * 列出目录内容
    * 
@@ -252,48 +295,6 @@ import {
         });
       },
     });
-  }
-}
- * WebDAV 文件系统类
- * 提供类似文件系统的 API 来操作 WebDAV 服务器
- */
-export class WebDAVFileSystem {
-  private baseUrl: string;
-  private username?: string;
-  private password?: string;
-  private token?: string;
-  private defaultHeaders: Record<string, string>;
-  private timeout: number;
-
-  /**
-   * 创建 WebDAV 文件系统实例
-   * 
-   * @param options WebDAV 配置选项
-   */
-  constructor(options: WebDAVOptions) {
-    // 确保 baseUrl 以 / 结尾
-    this.baseUrl = options.baseUrl.endsWith('/') 
-      ? options.baseUrl 
-      : `${options.baseUrl}/`;
-    
-    this.username = options.username;
-    this.password = options.password;
-    this.token = options.token;
-    this.timeout = options.timeout || 30000; // 默认 30 秒超时
-    
-    // 初始化默认请求头
-    this.defaultHeaders = {
-      'Content-Type': 'application/octet-stream',
-      ...options.headers,
-    };
-    
-    // 如果提供了认证信息，添加认证头
-    if (this.token) {
-      this.defaultHeaders['Authorization'] = `Bearer ${this.token}`;
-    } else if (this.username && this.password) {
-      const credentials = btoa(`${this.username}:${this.password}`);
-      this.defaultHeaders['Authorization'] = `Basic ${credentials}`;
-    }
   }
 
   /**
@@ -663,6 +664,4 @@ export class WebDAVFileSystem {
     const response = await this.sendRequest(path, { method: 'DELETE' });
     this.handleResponseError(response, path);
   }
-
-  /**
-   
+}

@@ -6,14 +6,13 @@ module.exports = {
   collectCoverageFrom: ['src/**/*.ts'],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov'],
+  moduleNameMapper: {
+    '^zen-fs$': '<rootDir>/node_modules/zen-fs',
+  },
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
       tsconfig: 'tsconfig.json',
-    }],
-  },
-  globals: {
-    'ts-jest': {
       isolatedModules: true,
-    },
+    }],
   },
 };

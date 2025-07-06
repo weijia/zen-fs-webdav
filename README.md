@@ -206,6 +206,63 @@ try {
 
 该库使用现代 Web API，如 `fetch` 和 `ReadableStream`/`WritableStream`。确保你的目标浏览器支持这些 API，或者使用适当的 polyfill。
 
+## 项目结构
+
+```
+├── .eslintrc.js - ESLint 配置文件
+├── .eslintrc.json - ESLint 配置文件
+├── .gitignore - Git 忽略规则
+├── .npmignore - NPM 发布忽略规则
+├── .prettierrc - Prettier 配置
+├── .prettierrc.js - Prettier 配置文件
+├── CHANGELOG.md - 变更日志
+├── CONTRIBUTING.md - 贡献指南
+├── coverage/ - 测试覆盖率报告
+├── docs/ - 文档
+│   └── api.md - API 文档
+├── examples/ - 示例代码
+│   ├── basic-usage.js - 基础使用示例(JS)
+│   ├── basic-usage.ts - 基础使用示例(TS)
+│   ├── browser-example.html - 浏览器示例
+│   ├── browser-usage.ts - 浏览器使用示例
+│   ├── node-example.js - Node.js 示例
+│   ├── node-usage.ts - Node.js 使用示例
+├── jest.config.js - Jest 配置
+├── jest.setup.js - Jest 设置
+├── LICENSE - 许可证文件
+├── package.json - 项目配置
+├── package-lock.json - 依赖锁定文件
+├── prompt.md - 提示文档
+├── README.md - 项目说明文档
+├── rollup.config.js - Rollup 配置
+├── src/ - 源代码目录
+│   ├── constants.ts - 常量定义
+│   ├── errors.ts - 错误处理
+│   ├── index.ts - 主入口文件
+│   ├── types.ts - 类型定义
+│   ├── ui/ - UI 相关代码
+│   ├── utils.ts - 工具函数
+│   ├── webdav-fs.ts - WebDAV 文件系统实现
+│   ├── webdav.ts - WebDAV 核心功能
+│   ├── WebDAVError.ts - WebDAV 错误类
+│   ├── WebDAVFileSystem.ts - WebDAV 文件系统类
+│   └── __tests__/ - 测试代码
+│       ├── errors.test.ts - 错误测试
+│       ├── integration.test.ts - 集成测试
+│       ├── utils.test.ts - 工具函数测试
+│       ├── webdav-fs.test.ts - 文件系统测试
+│       └── WebDAVFileSystem.test.ts - 文件系统类测试
+├── tests/ - 测试代码
+│   ├── webdav.test.ts - WebDAV 测试
+│   └── WebDAVFileSystem.test.ts - 文件系统测试
+├── tsconfig.json - TypeScript 配置
+├── tsup.config.ts - Tsup 构建配置
+└── __tests__/ - 测试代码
+    ├── utils.test.ts - 工具函数测试
+    ├── webdav-fs.test.ts - 文件系统测试
+    └── WebDAVFileSystem.test.ts - 文件系统测试
+```
+
 ## 许可证
 
 MIT
