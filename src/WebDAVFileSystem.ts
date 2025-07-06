@@ -477,6 +477,8 @@ export class WebDAVFileSystem {
     
     return {
       isDirectory,
+      name: path.split('/').filter(Boolean).pop() || '',
+      path: this.normalizePath(path),
       isFile: !isDirectory,
       size,
       lastModified: lastModifiedDate,

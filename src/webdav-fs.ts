@@ -171,15 +171,15 @@ export class WebDAVFS implements WebDAVFileSystem {
   private handleResponseError(status: number, path: string, error?: Error): never {
     switch (status) {
       case 401:
-        throw new AuthenticationError(`认证失败: ${path}`, undefined, error);
+        throw new AuthenticationError(`认证失败: ${path}`);
       case 403:
-        throw new AuthorizationError(`无权限访问: ${path}`, undefined, error);
+        throw new AuthorizationError(`无权限访问: ${path}`);
       case 404:
-        throw new NotFoundError(`资源不存在: ${path}`, undefined, error);
+        throw new NotFoundError(`资源不存在: ${path}`);
       case 409:
-        throw new FileExistsError(`资源已存在: ${path}`, undefined, error);
+        throw new FileExistsError(`资源已存在: ${path}`);
       default:
-        throw new ServerError(`服务器错误 (${status}): ${path}`, undefined, error);
+        throw new ServerError(`服务器错误 (${status}): ${path}`, status);
     }
   }
 
@@ -325,7 +325,7 @@ export class WebDAVFS implements WebDAVFileSystem {
       if (error instanceof WebDAVError) {
         throw error;
       }
-      throw new WebDAVError(`删除文件失败: ${normalizedPath}`, undefined, error);
+      throw new WebDAVError(`删除文件失败: ${normalizedPath}`);
     }
   }
 
