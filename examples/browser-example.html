@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>zen-fs-webdav 浏览器示例</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    h1 {
+      color: #333;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 10px;
+    }
+    .container {
+      display: flex;
+      gap: 20px;
+    }
+    .panel {
+      flex: 1;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 15px;
+    }
+    .file-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      max-height: 300px;
+      overflow-y: auto;
+      border: 1px solid #eee;
+      border-radius: 4px;
+    }
+    .file-list li {
+      padding: 8px 12px;
+      border-bottom: 1px solid #eee;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+    }
+    .file-list li:hover {
+      background-color: #f5f5f5;
+    }
+    .file-list li:last-child {
+      border-bottom: none;
+    }
+    .file-icon {
+      margin-right: 8px;
+      font-size: 1.2em;
+    }
+    .directory {
+      color: #2196F3;
+    }
+    .file {
+      color: #607D8B;
+    }
+    .actions {
+      margin-top: 15px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    button {
+      padding: 8px 12px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+    input[type="text"], textarea {
+      width: 100%;
+      padding: 8px;
+      margin: 5px 0 15px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+    .status {
+      margin-top: 15px;
+      padding: 10px;
+      border-radius: 4px;
+    }
+    .success {
+      background-color: #dff0d8;
+      color: #3c763d;
+    }
+    .error {
+      background-color: #f2dede;
+      color: #a94442;
+    }
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(0, 0, 0, 0.1);
+      border-radius: 50%;
+      border-top-color: #4CAF50;
+      animation: spin 1s ease-in-out infinite;
+      margin-right: 10px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>zen-fs-webdav 浏览器示例</h1>
+  
+  <div class="panel">
+    <h2>WebDAV 连接设置</h2>
+    <div>
+      <label for="baseUrl">WebDAV 服务器 URL:</label>
+      <input type="text" id="baseUrl" placeholder="https://your-webdav-server.com/webdav">
+    </div>
+    <div>
+      <label for="username">用户名:</label>
+      <input type="text" id="username" placeholder="用户名">
+    </div>
+    <div>
+      <label for="password">密码:</label>
+      <input type="password" id="password" placeholder="密码">
+    </div>
+    <div class="actions">
+      <button id="connectBtn">连接</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="panel">
+      <h2>文件浏览器</h2>
+      <div>
+        <label for="currentPath">当前路径:</label>
+        <input type="text" id="currentPath" value="/" readonly>
+      </div>
+      <ul class="file-list" id="fileList">
+        <li>请先连接到 WebDAV 服务器</li>
+      </ul>
+      <div class="actions">
+        <button id="parentDirBtn" disabled>上级目录</button>
+        <button id="refreshBtn" disabled>刷新</button>
+        <button id="newFolderBtn" disabled>新建文件夹</button>
+        <button id="uploadFileBtn" disabled>上传文件</button>
+        <input type="file" id="fileInput" class="hidden">
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>文件操作</h2>
+      <div>
+        <label for="selectedFile">选中的文件:</label>
+        <input type="text" id="selectedFile" readonly>
+      </div>
+      <div id="fileContent" class="hidden">
+        <label for="fileContentText">文件内容:</label>
+        <textarea id="fileContentText"></textarea>
+        <div class="actions">
+          <button id="saveFileBtn">保存</button>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="downloadBtn" disabled>下载</button>
+        <button id="deleteBtn" disabled>删除</button>
+        <button id="renameBtn" disabled>重命名</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="statusMessage" class="status hidden"></div>
+
+  <!-- 加载 zen-fs-webdav 库 -->
+  <script src="../dist/index.umd.js"></script>
+  
+  <script>
+    // 获取 WebDAVFS 类
+    const { WebDAVFS } = ZenWebDAVFS;
+    
+    // DOM 元素
+    const baseUrlInput = document.getElementById('baseUrl');
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    const connectBtn = document.getElementById('connectBtn');
+    const currentPathInput = document.getElementById('currentPath');
+    const fileList = document.getElementById('fileList');
+    const parentDirBtn = document.getElementById('parentDirBtn');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const newFolderBtn = document.getElementById('newFolderBtn');
+    const uploadFileBtn = document.getElementById('uploadFileBtn');
+    const fileInput = document.getElementById('fileInput');
+    const selectedFileInput = document.getElementById('selectedFile');
+    const fileContent = document.getElementById('fileContent');
+    const fileContentText = document.getElementById('fileContentText');
+    const saveFileBtn = document.getElementById('saveFileBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const deleteBtn = document.getElementById('deleteBtn');
+    const renameBtn = document.getElementById('renameBtn');
+    const statusMessage = document.getElementById('statusMessage');
+    
+    // WebDAV 客户端实例
+    let webdavFs = null;
+    let currentPath = '/';
+    let selectedFile = null;
+    
+    // 显示状态消息
+    function showStatus(message, isError = false) {
+      statusMessage.textContent = message;
+      statusMessage.className = `status ${isError ? 'error' : 'success'}`;
+      statusMessage.classList.remove('hidden');
+      
+      // 5秒后自动隐藏
+      setTimeout(() => {
+        statusMessage.classList.add('hidden');
+      }, 5000);
+    }
+    
+    // 显示加载中状态
+    function showLoading(element) {
+      element.disabled = true;
+      const originalText = element.textContent;
+      const loadingSpinner = document.createElement('span');
+      loadingSpinner.className = 'loading';
+      element.prepend(loadingSpinner);
+      
+      return () => {
+        element.disabled = false;
+        element.removeChild(loadingSpinner);
+      };
+    }
+    
+    // 连接到 WebDAV 服务器
+    connectBtn.addEventListener('click', async () => {
+      const baseUrl = baseUrlInput.value.trim();
+      if (!baseUrl) {
+        showStatus('请输入 WebDAV 服务器 URL', true);
+        return;
+      }
+      
+      const stopLoading = showLoading(connectBtn);
+      
+      try {
+        const options = {
+          baseUrl,
+          cache: true,
+          cacheExpiration: 30000
+        };
+        
+        const username = usernameInput.value.trim();
+        const password = passwordInput.value;
+        
+        if (username && password) {
+          options.auth = { username, password };
+        }
+        
+        webdavFs = new WebDAVFS(options);
+        
+        // 测试连接
+        await webdavFs.exists('/');
+        
+        // 启用按钮
+        parentDirBtn.disabled = false;
+        refreshBtn.disabled = false;
+        newFolderBtn.disabled = false;
+        uploadFileBtn.disabled = false;
+        
+        // 加载根目录
+        currentPath = '/';
+        currentPathInput.value = currentPath;
+        await loadDirectory(currentPath);
+        
+        showStatus('成功连接到 WebDAV 服务器');
+      } catch (error) {
+        console.error('连接错误:', error);
+        showStatus(`连接失败: ${error.message}`, true);
+      } finally {
+        stopLoading();
+      }
+    });
+    
+    // 加载目录内容
+    async function loadDirectory(path) {
+      if (!webdavFs) return;
+      
+      const stopLoading = showLoading(refreshBtn);
+      
+      try {
+        const files = await webdavFs.readDir(path);
+        
+        // 清空文件列表
+        fileList.innerHTML = '';
+        
+        if (files.length === 0) {
+          const li = document.createElement('li');
+          li.textContent = '(空目录)';
+          fileList.appendChild(li);
+        } else {
+          // 按类型和名称排序：先显示目录，再显示文件
+          files.sort((a, b) => {
+            if (a.isDirectory && !b.isDirectory) return -1;
+            if (!a.isDirectory && b.isDirectory) return 1;
+            return a.name.localeCompare(b.name);
+          });
+          
+          files.forEach(file => {
+            const li = document.createElement('li');
+            
+            const icon = document.createElement('span');
+            icon.className = `file-icon ${file.isDirectory ? 'directory' : 'file'}`;
+            icon.textContent = file.isDirectory ? '📁' : '📄';
+            li.appendChild(icon);
+            
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = file.name;
+            li.appendChild(nameSpan);
+            
+            li.addEventListener('click', () => {
+              if (file.isDirectory) {
+                // 进入目录
+                currentPath = `${path}/${file.name}`.replace(/\/+/g, '/');
+                currentPathInput.value = currentPath;
+                loadDirectory(currentPath);
+              } else {
+                // 选择文件
+                selectedFile = file;
+                selectedFileInput.value = file.name;
+                downloadBtn.disabled = false;
+                deleteBtn.disabled = false;
+                renameBtn.disabled = false;
+                
+                // 如果是文本文件，尝试加载内容
+                const isTextFile = file.contentType.startsWith('text/') || 
+                                  ['.txt', '.md', '.json', '.xml', '.html', '.css', '.js'].some(ext => 
+                                    file.name.toLowerCase().endsWith(ext));
+                
+                if (isTextFile) {
+                  loadFileContent(`${path}/${file.name}`.replace(/\/+/g, '/'));
+                } else {
+                  fileContent.classList.add('hidden');
+                }
+              }
+            });
+            
+            fileList.appendChild(li);
+          });
+        }
+        
+        currentPathInput.value = path;
+      } catch (error) {
+        console.error('加载目录错误:', error);
+        showStatus(`加载目录失败: ${error.message}`, true);
+      } finally {
+        stopLoading();
+      }
+    }
+    
+    // 加载文件内容
+    async function loadFileContent(filePath) {
+      const stopLoading = showLoading(downloadBtn);
+      
+      try {
+        const content = await webdavFs.readFile(filePath, { encoding: 'utf8' });
+        fileContentText.value = content;
+        fileContent.classList.remove('hidden');
+      } catch (error) {
+        console.error('加载文件内容错误:', error);
+        showStatus(`加载文件内容失败: ${error.message}`, true);
+        fileContent.classList.add('hidden');
+      } finally {
+        stopLoading();
+      }
+    }
+    
+    // 上级目录按钮
+    parentDirBtn.addEventListener('click', () => {
+      if (currentPath === '/') return;
+      
+      const parts = currentPath.split('/').filter(Boolean);
+      parts.pop();
+      currentPath = parts.length === 0 ? '/' : `/${parts.join('/')}`;
+      loadDirectory(currentPath);
+    });
+    
+    // 刷新按钮
+    refreshBtn.addEventListener('click', () => {
+      loadDirectory(currentPath);
+    });
+    
+    // 新建文件夹按钮
+    newFolderBtn.addEventListener('click', async () => {
+      const folderName = prompt('请输入文件夹名称:');
+      if (!folderName) return;
+      
+      const stopLoading = showLoading(newFolderBtn);
+      
+      try {
+        const folderPath = `${currentPath}/${folderName}`.replace(/\/+/g, '/');
+        await webdavFs.mkdir(folderPath);
+        showStatus(`文件夹 "${folderName}" 创建成功`);
+        loadDirectory(currentPath);
+      } catch (error) {
+        console.error('创建文件夹错误:', error);
+        showStatus(`创建文件夹失败: ${error.message}`, true);
+      } finally {
+        stopLoading();
+      }
+    });
+    
+    // 上传文件按钮
+    uploadFileBtn.addEventListener('click', () => {
+      fileInput.click();
+    });
+    
+    // 处理文件上传
+    fileInput.addEventListener('change', async () => {
+      if (!fileInput.files || fileInput.files.length === 0) return;
+      
+      const file = fileInput.files[0];
+      const stopLoading = showLoading(uploadFileBtn);
+      
+      try {
+        const filePath = `${currentPath}/${file.name}`.replace(/\/+/g, '/');
+        
+        // 读取文件内容
+        const content = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          
+          if (file.type.startsWith('text/')) {
+            reader.readAsText(file);
+          } else {
+            reader.readAsArrayBuffer(file);
+          }
+        });
+        
+        // 上传到 WebDAV 服务器
+        await webdavFs.writeFile(filePath, content);
+        showStatus(`文件 "${file.name}" 上传成功`);
+        loadDirectory(currentPath);
+        
+        // 清除文件输入，以便可以再次上传同一文件
+        fileInput.value = '';
+      } catch (error) {
+        console.error('上传文件错误:', error);
+        showStatus(`上传文件失败: ${error.message}`, true);
+      } finally {
+        stopLoading();
+      }
+    });
+    
+    // 保存文件按钮
+    saveFileBtn.addEventListener('click', async () => {
+      if (!selectedFile) return;
+      
+      const stopLoading = showLoading(saveFileBtn);
+      
+      try {
+        const filePath = `${currentPath}/${selectedFile.name}`.replace(/\/+/g, '/');
+        const content = fileContentText.value;
+        
+        await webdavFs.writeFile(filePath, content);
+        showStatus(`文件 "${selectedFile.name}" 保存成功`);
+      } catch (error) {
+        console.error('保存文件错误:', error);
+        showStatus(`保存文件失败: ${error.message}`, true);
+      } finally {
+        stopLoading();
+      }
+    });
+    
+    // 下载按钮
+    downloadBtn.addEventListener('click', async () => {
+      if (!selectedFile) return;
+      
+      const stopLoading = showLoading(downloadBtn);
+      
+      try {
+        const filePath = `${currentPath}/${selectedFile.name}`.replace(/\/+/g, '/');
+        let content = await webdavFs.readFile(filePath);
+        
+        // 创建下载链接
+        const blob = new Blob([content], { type: selectedFile.contentType || 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = selectedFile.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        showStatus(`文件 "${selectedFile.name}" 下载成功`);
+      } catch (error) {
+        console.error('下载文件错误:', error);
+        showStatus(`下载文件失败: ${error.message}`, true);
+      } finally {
+        stopLoading();
+      }
+    });
+    
+    // 删除按钮
+    deleteBtn.addEventListener('click', async () => {
+      if (!selectedFile) return;
+      
+      if (!confirm(`确定要删除 "${selectedFile.name}" 吗？`)) return;
+      
+      const stopLoading = showLoading(deleteBtn);
+      
+      try {
+        const filePath = `${currentPath}/${selectedFile.name}`.replace(/\/+/g, '/');
+        
+        if (selectedFile.isDirectory) {
+          await webdavFs.rmdir(filePath, { recursive: true });
+        } else {
+          await webdavFs.deleteFile(filePath);
+        }
+        
+        showStatus(`${selectedFile.isDirectory ? '目录' : '文件'} "${selectedFile.name}" 删除成功`);
+        
+        // 重置选中状态
+        selectedFile = null;
+        selectedFileInput.value = '';
+        fileContent.classList.add('hidden');
+        downloadBtn.disabled = true;
+        deleteBtn.disabled = true;
+        renameBtn.disabled = true;
+        
+        // 刷新目录
+        loadDirectory(currentPath);
+      } catch (error) {
+        console.error('删除错误:', error);
+        showStatus(`删除失败: ${error.message}`, true);
+      } finally {
+        stopLoading();
+      }
+    });
+    
+    // 重命名按钮
+    renameBtn.addEventListener('click', async () => {
+      if (!selectedFile) return;
+      
+      const newName = prompt('请输入新名称:', selectedFile.name);
+      if (!newName || newName === selectedFile.name) return;
+      
+      const stopLoading = showLoading(renameBtn);
+      
+      try {
+        const sourcePath = `${currentPath}/${selectedFile.name}`.replace(/\/+/g, '/');
+        const destPath = `${currentPath}/${newName}`.replace(/\/+/g, '/');
+        
+        await webdavFs.move(sourcePath, destPath);
+        showStatus(`重命名为 "${newName}" 成功`);
+        
+        // 重置选中状态
+        selectedFile = null;
+        selectedFileInput.value = '';
+        fileContent.classList.add('hidden');
+        downloadBtn.disabled = true;
+        deleteBtn.disabled = true;
+        renameBtn.disabled = true;
+        
+        // 刷新目录
+        loadDirectory(currentPath);
+      } catch (error) {
+        console.error('重命名错误:', error);
+        showStatus(`重命名失败: ${error.message}`, true);
+      } finally {
+        stopLoading();
+      }
+    });
+    
+    // 初始化
+    window.addEventListener('load', () => {
+      // 从本地存储加载上次的连接信息
+      const savedBaseUrl = localStorage.getItem('webdav-baseUrl');
+      const savedUsername = localStorage.getItem('webdav-username');
+      
+      if (savedBaseUrl) {
+        baseUrlInput.value = savedBaseUrl;
+      }
+      
+      if (savedUsername) {
+        usernameInput.value = savedUsername;
+      }
+    });
+    
+    // 保存连接信息到本地存储
+    connectBtn.addEventListener('click', () => {
+      localStorage.setItem('webdav-baseUrl', baseUrlInput.value);
+      localStorage.setItem('webdav-username', usernameInput.value);
+      // 出于安全考虑，不保存密码
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+{
+  "name": "zen-fs-webdav",
+  "version": "0.1.0",
+  "description": "一个简单、现代的 WebDAV 客户端库，提供类似文件系统的 API",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "prepublishOnly": "npm run build",
+    "clean": "rimraf dist"
+  },
+  "keywords": [
+    "webdav",
+    "filesystem",
+    "fs",
+    "client",
+    "api",
+    "browser",
+    "node"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/zen-fs-webdav.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/zen-fs-webdav/issues"
+  },
+  "homepage": "https://github.com/yourusername/zen-fs-webdav#readme",
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^18.15.11",
+    "@typescript-eslint/eslint-plugin": "^5.57.1",
+    "@typescript-eslint/parser": "^5.57.1",
+    "eslint": "^8.38.0",
+    "jest": "^29.5.0",
+    "jest-environment-jsdom": "^29.5.0",
+    "prettier": "^2.8.7",
+    "rimraf": "^5.0.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.0.4"
+  },
+  "dependencies": {},
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "jsdom",
+    "testMatch": [
+      "**/__tests__/**/*.test.ts"
+    ],
+    "collectCoverage": true,
+    "coverageDirectory": "coverage",
+    "collectCoverageFrom": [
+      "src/**/*.ts",
+      "!src/**/*.d.ts",
+      "!src/**/__tests__/**"
+    ]
+  }
+}
