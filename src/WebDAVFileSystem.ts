@@ -66,79 +66,86 @@ export class WebDAVFileSystem {
    */
   async readdir(path: string, options: ReaddirOptions = {}): Promise<FileEntry[]> {
     const { depth = 1 } = options;
-    
     // 确保路径以 / 结尾
     const dirPath = path.endsWith('/') ? path : `${path}/`;
-    
+    const { createPropfindXml, parseXml } = await import('./utils');
+    const xmlBody = createPropfindXml([
+      'resourcetype',
+      'getcontentlength',
+      'getlastmodified',
+      'creationdate',
+    ]);
     const response = await this.sendRequest(dirPath, {
       method: 'PROPFIND',
       headers: {
         'Depth': depth.toString(),
         'Content-Type': 'application/xml',
       },
-      body: `<?xml version="1.0" encoding="utf-8" ?>
-        <D:propfind xmlns:D="DAV:">
-          <D:prop>
-            <D:resourcetype/>
-            <D:getcontentlength/>
-            <D:getlastmodified/>
-            <D:creationdate/>
-          </D:prop>
-        </D:propfind>`,
+      body: xmlBody,
     });
-    
     this.handleResponseError(response, dirPath);
-    
     const text = await response.text();
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(text, 'application/xml');
-    
-    // 获取所有响应
-    const responses = xmlDoc.querySelectorAll('response');
+    const xmlDoc = parseXml(text);
+    // 用 getElementsByTagName 兼容 xmldom
+    const responses = xmlDoc.getElementsByTagName('response');
     const entries: FileEntry[] = [];
-    
-    // 解析每个响应
     for (let i = 0; i < responses.length; i++) {
       const responseElem = responses[i];
-      
-      // 获取 href
-      const hrefElem = responseElem.querySelector('href');
+      // href
+      const hrefElem = responseElem.getElementsByTagName('href')[0];
       if (!hrefElem || !hrefElem.textContent) continue;
-      
-      // 解码 URL 并提取路径
       const href = decodeURIComponent(hrefElem.textContent);
-      
       // 跳过当前目录
       if (href === this.buildUrl(dirPath)) continue;
-      
-      // 提取文件名
+      // 文件名
       const name = href.endsWith('/')
         ? href.split('/').filter(Boolean).pop() || ''
         : href.split('/').pop() || '';
-      
-      // 检查是否为目录
-      const resourceType = responseElem.querySelector('resourcetype');
-      const isDirectory = resourceType ? !!resourceType.querySelector('collection') : false;
-      
-      // 获取文件大小
-      const contentLength = responseElem.querySelector('getcontentlength');
-      const size = contentLength && contentLength.textContent
-        ? parseInt(contentLength.textContent, 10)
-        : undefined;
-      
-      // 获取最后修改时间
-      const lastModified = responseElem.querySelector('getlastmodified');
-      const lastModifiedDate = lastModified && lastModified.textContent
-        ? new Date(lastModified.textContent)
-        : undefined;
-      
-      // 获取创建时间
-      const creationDate = responseElem.querySelector('creationdate');
-      const createdAtDate = creationDate && creationDate.textContent
-        ? new Date(creationDate.textContent)
-        : undefined;
-      
-      // 创建文件条目
+      // 是否为目录
+      let isDirectory = false;
+      const propstat = responseElem.getElementsByTagName('propstat')[0];
+      if (propstat) {
+        const prop = propstat.getElementsByTagName('prop')[0];
+        if (prop) {
+          const resType = prop.getElementsByTagName('resourcetype')[0];
+          if (resType && resType.getElementsByTagName('collection').length > 0) {
+            isDirectory = true;
+          }
+        }
+      }
+      // 文件大小
+      let size: number | undefined = undefined;
+      if (propstat) {
+        const prop = propstat.getElementsByTagName('prop')[0];
+        if (prop) {
+          const lenElem = prop.getElementsByTagName('getcontentlength')[0];
+          if (lenElem && lenElem.textContent) {
+            size = parseInt(lenElem.textContent, 10);
+          }
+        }
+      }
+      // 最后修改时间
+      let lastModifiedDate: Date | undefined = undefined;
+      if (propstat) {
+        const prop = propstat.getElementsByTagName('prop')[0];
+        if (prop) {
+          const lastModElem = prop.getElementsByTagName('getlastmodified')[0];
+          if (lastModElem && lastModElem.textContent) {
+            lastModifiedDate = new Date(lastModElem.textContent);
+          }
+        }
+      }
+      // 创建时间
+      let createdAtDate: Date | undefined = undefined;
+      if (propstat) {
+        const prop = propstat.getElementsByTagName('prop')[0];
+        if (prop) {
+          const createElem = prop.getElementsByTagName('creationdate')[0];
+          if (createElem && createElem.textContent) {
+            createdAtDate = new Date(createElem.textContent);
+          }
+        }
+      }
       entries.push({
         name,
         isDirectory,
@@ -148,7 +155,6 @@ export class WebDAVFileSystem {
         path: href.replace(this.baseUrl, '/'),
       });
     }
-    
     return entries;
   }
 
@@ -413,14 +419,28 @@ export class WebDAVFileSystem {
    */
   async exists(path: string): Promise<boolean> {
     try {
-      const response = await this.sendRequest(path, { method: 'HEAD' });
-      return response.ok;
+      const { createPropfindXml, parseXml } = await import('./utils');
+      const xmlBody = createPropfindXml([
+        'resourcetype',
+      ]);
+      const response = await this.sendRequest(path, {
+        method: 'PROPFIND',
+        headers: {
+          'Depth': '0',
+          'Content-Type': 'application/xml',
+        },
+        body: xmlBody,
+      });
+      if (!response.ok) return false;
+      const text = await response.text();
+      const xmlDoc = parseXml(text);
+      const responses = xmlDoc.getElementsByTagName('response');
+      return responses.length > 0;
     } catch (error) {
-      // 如果是网络错误以外的错误，假设文件不存在
-      if (error instanceof WebDAVError && error.status === 404) {
+      if (error instanceof WebDAVError && (error as any).statusCode === 404) {
         return false;
       }
-      throw error;
+      return false;
     }
   }
 
@@ -432,49 +452,54 @@ export class WebDAVFileSystem {
    * @throws WebDAVError 当文件或目录不存在时
    */
   async stat(path: string): Promise<Stats> {
+    const { createPropfindXml, parseXml } = await import('./utils');
+    const xmlBody = createPropfindXml([
+      'resourcetype',
+      'getcontentlength',
+      'getlastmodified',
+      'creationdate',
+    ]);
     const response = await this.sendRequest(path, {
       method: 'PROPFIND',
       headers: {
         'Depth': '0',
         'Content-Type': 'application/xml',
       },
-      body: `<?xml version="1.0" encoding="utf-8" ?>
-        <D:propfind xmlns:D="DAV:">
-          <D:prop>
-            <D:resourcetype/>
-            <D:getcontentlength/>
-            <D:getlastmodified/>
-            <D:creationdate/>
-          </D:prop>
-        </D:propfind>`,
+      body: xmlBody,
     });
-    
     this.handleResponseError(response, path);
-    
     const text = await response.text();
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(text, 'application/xml');
-    
-    // 检查是否为目录
-    const resourceType = xmlDoc.querySelector('resourcetype');
-    const isDirectory = resourceType ? !!resourceType.querySelector('collection') : false;
-    
-    // 获取文件大小
-    const contentLength = xmlDoc.querySelector('getcontentlength');
-    const size = contentLength ? parseInt(contentLength.textContent || '0', 10) : 0;
-    
-    // 获取最后修改时间
-    const lastModified = xmlDoc.querySelector('getlastmodified');
-    const lastModifiedDate = lastModified && lastModified.textContent 
-      ? new Date(lastModified.textContent) 
-      : undefined;
-    
-    // 获取创建时间
-    const creationDate = xmlDoc.querySelector('creationdate');
-    const createdAtDate = creationDate && creationDate.textContent 
-      ? new Date(creationDate.textContent) 
-      : undefined;
-    
+    const xmlDoc = parseXml(text);
+    // 只取第一个 response
+    const responseElem = xmlDoc.getElementsByTagName('response')[0];
+    let isDirectory = false;
+    let size = 0;
+    let lastModifiedDate: Date | undefined = undefined;
+    let createdAtDate: Date | undefined = undefined;
+    if (responseElem) {
+      const propstat = responseElem.getElementsByTagName('propstat')[0];
+      if (propstat) {
+        const prop = propstat.getElementsByTagName('prop')[0];
+        if (prop) {
+          const resType = prop.getElementsByTagName('resourcetype')[0];
+          if (resType && resType.getElementsByTagName('collection').length > 0) {
+            isDirectory = true;
+          }
+          const lenElem = prop.getElementsByTagName('getcontentlength')[0];
+          if (lenElem && lenElem.textContent) {
+            size = parseInt(lenElem.textContent, 10);
+          }
+          const lastModElem = prop.getElementsByTagName('getlastmodified')[0];
+          if (lastModElem && lastModElem.textContent) {
+            lastModifiedDate = new Date(lastModElem.textContent);
+          }
+          const createElem = prop.getElementsByTagName('creationdate')[0];
+          if (createElem && createElem.textContent) {
+            createdAtDate = new Date(createElem.textContent);
+          }
+        }
+      }
+    }
     return {
       isDirectory,
       name: path.split('/').filter(Boolean).pop() || '',
@@ -524,24 +549,27 @@ export class WebDAVFileSystem {
     data: string | ArrayBuffer, 
     options: WriteFileOptions = {}
   ): Promise<void> {
-    const { contentType } = options;
-    
+    let { contentType } = options;
+    // 如果 data 是 string 且 encoding 为 utf8 或未指定，Content-Type 应为 text/plain;charset=UTF-8
+    if (typeof data === 'string') {
+      const encoding = (options as any)?.encoding;
+      if (!contentType && (!encoding || encoding === 'utf8' || encoding === 'utf-8')) {
+        contentType = 'text/plain;charset=UTF-8';
+      }
+    }
     // 如果不允许覆盖且文件已存在，则抛出错误
     if (options.overwrite === false && await this.exists(path)) {
       throw new WebDAVError(`文件已存在: ${path}`, 412);
     }
-    
     const headers: Record<string, string> = {};
     if (contentType) {
       headers['Content-Type'] = contentType;
     }
-    
     const response = await this.sendRequest(path, {
       method: 'PUT',
       headers,
       body: data,
     });
-    
     this.handleResponseError(response, path);
   }
 
@@ -664,6 +692,60 @@ export class WebDAVFileSystem {
     
     // 删除目录本身
     const response = await this.sendRequest(path, { method: 'DELETE' });
+    this.handleResponseError(response, path);
+  }
+
+  /**
+   * 获取文件或目录的 WebDAV 属性
+   * @param path 文件或目录路径
+   * @returns 属性对象
+   */
+  async getProps(path: string): Promise<Record<string, any>> {
+    // 使用 PROPFIND allprop 获取所有属性
+    const { createPropfindXml, parseXml } = await import('./utils');
+    const xmlBody = createPropfindXml();
+    const response = await this.sendRequest(path, {
+      method: 'PROPFIND',
+      headers: {
+        'Content-Type': 'application/xml',
+        'Depth': '0',
+      },
+      body: xmlBody,
+    });
+    this.handleResponseError(response, path);
+    const responseText = await response.text();
+    const doc = parseXml(responseText);
+    // 解析属性
+    const propElements = doc.getElementsByTagNameNS('DAV:', 'prop');
+    const props: Record<string, any> = {};
+    if (propElements.length > 0) {
+      const propElem = propElements[0];
+      for (let i = 0; i < propElem.childNodes.length; i++) {
+        const node = propElem.childNodes[i];
+        if (node.nodeType === 1) {
+          const el = node as Element;
+          props[el.localName] = el.textContent;
+        }
+      }
+    }
+    return props;
+  }
+
+  /**
+   * 设置文件或目录的 WebDAV 属性
+   * @param path 文件或目录路径
+   * @param props 属性对象
+   */
+  async setProps(path: string, props: Record<string, any>): Promise<void> {
+    const { createProppatchXml } = await import('./utils');
+    const xmlBody = createProppatchXml(props);
+    const response = await this.sendRequest(path, {
+      method: 'PROPPATCH',
+      headers: {
+        'Content-Type': 'application/xml',
+      },
+      body: xmlBody,
+    });
     this.handleResponseError(response, path);
   }
 }
