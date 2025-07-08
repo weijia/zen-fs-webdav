@@ -5,9 +5,10 @@
 
 // 导出主类
 export { WebDAVFileSystem } from './WebDAVFileSystem';
+export { createWebDAVFileSystem } from './webdav';
 
 // 导出错误类
-export { WebDAVError } from './WebDAVError';
+export { WebDAVError } from './errors';
 
 // 导出类型定义
 export {

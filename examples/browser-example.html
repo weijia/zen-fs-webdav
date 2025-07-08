@@ -192,7 +192,7 @@
   
   <script>
     // 获取 WebDAVFS 类
-    const { WebDAVFS } = ZenWebDAVFS;
+    const { createWebDAVFileSystem } = ZenWebDAVFS;
     
     // DOM 元素
     const baseUrlInput = document.getElementById('baseUrl');
@@ -253,39 +253,51 @@
         showStatus('请输入 WebDAV 服务器 URL', true);
         return;
       }
-      
+
       const stopLoading = showLoading(connectBtn);
-      
+
       try {
         const options = {
           baseUrl,
           cache: true,
           cacheExpiration: 30000
         };
-        
+
         const username = usernameInput.value.trim();
         const password = passwordInput.value;
-        
+
         if (username && password) {
           options.auth = { username, password };
         }
-        
-        webdavFs = new WebDAVFS(options);
-        
+
+        webdavFs = createWebDAVFileSystem(options);
+
+        // 解析 baseUrl 路径部分作为初始 currentPath
+        let urlObj;
+        try {
+          urlObj = new URL(baseUrl);
+        } catch (e) {
+          showStatus('无效的 URL', true);
+          stopLoading();
+          return;
+        }
+        let basePath = urlObj.pathname || '/';
+        if (!basePath.endsWith('/')) basePath += '/';
+        currentPath = basePath;
+        currentPathInput.value = currentPath;
+
         // 测试连接
-        await webdavFs.exists('/');
-        
+        await webdavFs.exists(currentPath);
+
         // 启用按钮
         parentDirBtn.disabled = false;
         refreshBtn.disabled = false;
         newFolderBtn.disabled = false;
         uploadFileBtn.disabled = false;
-        
+
         // 加载根目录
-        currentPath = '/';
-        currentPathInput.value = currentPath;
         await loadDirectory(currentPath);
-        
+
         showStatus('成功连接到 WebDAV 服务器');
       } catch (error) {
         console.error('连接错误:', error);

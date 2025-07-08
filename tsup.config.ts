@@ -2,7 +2,7 @@ import { defineConfig } from 'tsup';
 
 export default defineConfig({
   entry: ['src/index.ts'],
-  format: ['cjs', 'esm'],
+  format: ['cjs', 'esm', 'iife'],
   dts: true,
   splitting: false,
   sourcemap: true,
@@ -10,14 +10,15 @@ export default defineConfig({
   minify: false,
   outExtension({ format }) {
     return {
-      js: format === 'cjs' ? '.js' : '.mjs',
+      js: format === 'cjs' ? '.js' : format === 'iife' ? '.umd.js' : '.mjs',
     };
   },
+  globalName: 'ZenWebDAVFS',
   target: 'es2020',
   platform: 'neutral',
   esbuildOptions(options) {
     options.banner = {
-      js: '// zen-fs-webdav - https://github.com/username/zen-fs-webdav',
+      js: '// zen-fs-webdav - https://github.com/weijia/zen-fs-webdav',
     };
   },
 });

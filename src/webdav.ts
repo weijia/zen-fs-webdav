@@ -1,5 +1,5 @@
-
 import { WebDAVOptions } from './types';
+import { WebDAVFS } from './webdav-fs';
 import { WebDAVFileSystem } from './WebDAVFileSystem';
 
 /**
@@ -8,6 +8,5 @@ import { WebDAVFileSystem } from './WebDAVFileSystem';
  * @returns WebDAVFileSystem 实例
  */
 export function createWebDAVFileSystem(options: WebDAVOptions): WebDAVFileSystem {
-  return new WebDAVFileSystem(options);
+  return new WebDAVFS(options);
 }
-// 清理遗留的无效代码

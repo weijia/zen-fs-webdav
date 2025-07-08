@@ -156,6 +156,7 @@ export interface ReadFileOptions {
    * 编码（仅当 responseType 为 'text' 时有效）
    */
   encoding?: string;
+  headers?: Record<string, string>;
 }
 
 /**
@@ -206,6 +207,9 @@ export interface ReaddirOptions {
    * 深度，1 表示只列出当前目录，大于 1 表示递归列出子目录
    */
   depth?: number;
+  includeHidden?: boolean;
+  headers?: Record<string, string>;
+  recursive?: boolean;
 }
 
 /**

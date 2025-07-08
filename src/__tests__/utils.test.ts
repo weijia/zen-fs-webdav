@@ -1,15 +1,26 @@
 import {
   normalizePath,
-  parseXML,
-  buildBasicAuthHeader,
   getParentPath,
-  getFilenameFromPath,
-  isDirectory,
-  parseContentType,
-  formatDate,
-  buildPropfindXML,
-  extractFilesFromMultistatus,
-  extractStatsFromProps,
+  joinUrl,
+  getBasename,
+  createBasicAuthHeader,
+  parseWebDAVProperties,
+  parseMultiStatus,
+  createPropfindXml,
+  createProppatchXml,
+  propertiesToStats,
+  parseXml,
+  isSuccessStatus,
+  extractPathFromUrl,
+  createTimeoutPromise,
+  createAbortController,
+  isBlobSupported,
+  isArrayBufferSupported,
+  toArrayBuffer,
+  arrayBufferToString,
+  getContentType,
+  getDirFromPath,
+  parseWebDAVXml,
 } from '../utils';
 
 describe('Utils', () => {
@@ -27,32 +38,6 @@ describe('Utils', () => {
     });
   });
 
-  describe('parseXML', () => {
-    it('should parse XML correctly', async () => {
-      const xml = '<root><item>value</item></root>';
-      const result = await parseXML(xml);
-      expect(result).toHaveProperty('root');
-      expect(result.root).toHaveProperty('item');
-      expect(result.root.item).toBe('value');
-    });
-
-    it('should handle empty XML', async () => {
-      await expect(parseXML('')).rejects.toThrow();
-    });
-  });
-
-  describe('buildBasicAuthHeader', () => {
-    it('should build basic auth header correctly', () => {
-      const auth = { username: 'user', password: 'pass' };
-      const header = buildBasicAuthHeader(auth);
-      expect(header).toBe('Basic dXNlcjpwYXNz'); // 'user:pass' in base64
-    });
-
-    it('should return undefined if auth is not provided', () => {
-      expect(buildBasicAuthHeader(undefined)).toBeUndefined();
-    });
-  });
-
   describe('getParentPath', () => {
     it('should get parent path correctly', () => {
       expect(getParentPath('/path/to/file')).toBe('/path/to');
@@ -62,144 +47,187 @@ describe('Utils', () => {
     });
   });
 
-  describe('getFilenameFromPath', () => {
-    it('should get filename from path correctly', () => {
-      expect(getFilenameFromPath('/path/to/file.txt')).toBe('file.txt');
-      expect(getFilenameFromPath('/path/to/file')).toBe('file');
-      expect(getFilenameFromPath('/path/to/')).toBe('to');
-      expect(getFilenameFromPath('/path')).toBe('path');
-      expect(getFilenameFromPath('/')).toBe('');
+  describe('joinUrl', () => {
+    it('should join url parts correctly', () => {
+      expect(joinUrl('http://a.com', 'b')).toBe('http://a.com/b');
+      expect(joinUrl('http://a.com/', '/b')).toBe('http://a.com/b');
+      expect(joinUrl('http://a.com/', 'b/', '/c')).toBe('http://a.com/b/c');
+      expect(joinUrl('http://a.com', '/b/', '/c/')).toBe('http://a.com/b/c/');
+      expect(joinUrl('http://a.com/', '', '/b', '', 'c')).toBe('http://a.com/b/c');
+      expect(joinUrl('http://a.com/', '', '', '')).toBe('http://a.com/');
+      // 新增：base带路径时，paths中重复路径部分会被去除
+      expect(joinUrl('http://a.com/webdav', '/webdav/file.txt')).toBe('http://a.com/webdav/file.txt');
+      expect(joinUrl('http://a.com/webdav/', '/webdav/dir/', 'sub')).toBe('http://a.com/webdav/dir/sub');
+      expect(joinUrl('http://a.com/webdav', 'webdav/dir/file')).toBe('http://a.com/webdav/dir/file');
+      expect(joinUrl('http://a.com/webdav/', '/webdav/')).toBe('http://a.com/webdav/');
     });
   });
 
-  describe('isDirectory', () => {
-    it('should determine if path is a directory', () => {
-      expect(isDirectory('/path/')).toBe(true);
-      expect(isDirectory('/path/to/')).toBe(true);
-      expect(isDirectory('/path/to/file')).toBe(false);
-      expect(isDirectory('/path/to/file.txt')).toBe(false);
+  describe('getBasename', () => {
+    it('should get basename correctly', () => {
+      expect(getBasename('/path/to/file.txt')).toBe('file.txt');
+      expect(getBasename('/path/to/')).toBe('to');
+      expect(getBasename('/')).toBe('');
     });
   });
 
-  describe('parseContentType', () => {
-    it('should parse content type correctly', () => {
-      expect(parseContentType('text/plain; charset=utf-8')).toBe('text/plain');
-      expect(parseContentType('application/json')).toBe('application/json');
-      expect(parseContentType('')).toBe('');
-      expect(parseContentType(undefined)).toBe('');
+  describe('createBasicAuthHeader', () => {
+    it('should create basic auth header', () => {
+      expect(createBasicAuthHeader('user', 'pass')).toBe('Basic dXNlcjpwYXNz');
     });
   });
 
-  describe('formatDate', () => {
-    it('should format date correctly', () => {
-      const date = new Date('2023-01-01T12:00:00Z');
-      expect(formatDate(date)).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
-    });
-
-    it('should handle invalid date', () => {
-      expect(formatDate(new Date('invalid'))).toBe('');
+  describe('parseWebDAVProperties', () => {
+    it('should parse WebDAV properties from XML Document', () => {
+      const xmlStr = `<?xml version="1.0"?><d:prop xmlns:d="DAV:"><d:displayname>file.txt</d:displayname></d:prop>`;
+      const doc = parseXml(xmlStr);
+      const props = parseWebDAVProperties(doc);
+      expect(props.displayName).toBe('file.txt');
     });
   });
 
-  describe('buildPropfindXML', () => {
-    it('should build PROPFIND XML correctly', () => {
-      const xml = buildPropfindXML();
-      expect(xml).toContain('<D:propfind');
-      expect(xml).toContain('<D:prop>');
-      expect(xml).toContain('<D:resourcetype/>');
-      expect(xml).toContain('<D:getcontentlength/>');
-      expect(xml).toContain('<D:getlastmodified/>');
-      expect(xml).toContain('<D:getcontenttype/>');
+  describe('parseMultiStatus', () => {
+    it('should parse multi-status XML', () => {
+      const xmlStr = `<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"><d:response><d:href>/file.txt</d:href><d:propstat><d:prop><d:displayname>file.txt</d:displayname></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>`;
+      const doc = parseXml(xmlStr);
+      const arr = parseMultiStatus(doc);
+      expect(arr.length).toBeGreaterThan(0);
+      expect(arr[0].href).toContain('/file.txt');
+      expect(arr[0].properties.displayName).toBe('file.txt');
     });
   });
 
-  describe('extractFilesFromMultistatus', () => {
-    it('should extract files from multistatus response', () => {
-      const multistatus = {
-        'D:multistatus': {
-          'D:response': [
-            {
-              'D:href': '/path/',
-              'D:propstat': {
-                'D:prop': {
-                  'D:resourcetype': { 'D:collection': {} },
-                  'D:getlastmodified': 'Mon, 01 Jan 2023 12:00:00 GMT',
-                },
-                'D:status': 'HTTP/1.1 200 OK',
-              },
-            },
-            {
-              'D:href': '/path/file.txt',
-              'D:propstat': {
-                'D:prop': {
-                  'D:resourcetype': {},
-                  'D:getcontentlength': '100',
-                  'D:getlastmodified': 'Mon, 01 Jan 2023 12:00:00 GMT',
-                  'D:getcontenttype': 'text/plain',
-                },
-                'D:status': 'HTTP/1.1 200 OK',
-              },
-            },
-          ],
-        },
-      };
-
-      const baseUrl = 'https://example.com';
-      const path = '/path';
-      const files = extractFilesFromMultistatus(multistatus, baseUrl, path);
-
-      expect(files).toHaveLength(1); // Only the file, not the current directory
-      expect(files[0]).toHaveProperty('name', 'file.txt');
-      expect(files[0]).toHaveProperty('isDirectory', false);
-      expect(files[0]).toHaveProperty('size', 100);
-      expect(files[0]).toHaveProperty('lastModified');
-      expect(files[0]).toHaveProperty('contentType', 'text/plain');
+  describe('createPropfindXml', () => {
+    it('should create propfind xml for allprop', () => {
+      const xml = createPropfindXml();
+      expect(xml).toContain('<d:allprop/>');
     });
-
-    it('should handle empty response', () => {
-      const multistatus = { 'D:multistatus': {} };
-      const baseUrl = 'https://example.com';
-      const path = '/path';
-      const files = extractFilesFromMultistatus(multistatus, baseUrl, path);
-      expect(files).toEqual([]);
+    it('should create propfind xml for specific props', () => {
+      const xml = createPropfindXml(['displayname', 'getcontentlength']);
+      expect(xml).toContain('<d:displayname/>');
+      expect(xml).toContain('<d:getcontentlength/>');
     });
   });
 
-  describe('extractStatsFromProps', () => {
-    it('should extract stats from props for a file', () => {
-      const props = {
-        'D:resourcetype': {},
-        'D:getcontentlength': '100',
-        'D:getlastmodified': 'Mon, 01 Jan 2023 12:00:00 GMT',
-        'D:getcontenttype': 'text/plain',
-      };
-
-      const name = 'file.txt';
-      const stats = extractStatsFromProps(props, name);
-
-      expect(stats).toHaveProperty('name', 'file.txt');
-      expect(stats).toHaveProperty('isDirectory', false);
-      expect(stats).toHaveProperty('size', 100);
-      expect(stats).toHaveProperty('lastModified');
-      expect(stats.lastModified).toBeInstanceOf(Date);
-      expect(stats).toHaveProperty('contentType', 'text/plain');
+  describe('createProppatchXml', () => {
+    it('should create proppatch xml', () => {
+      const xml = createProppatchXml({ displayname: 'file.txt' });
+      expect(xml).toContain('<d:displayname>file.txt</d:displayname>');
     });
+  });
 
-    it('should extract stats from props for a directory', () => {
-      const props = {
-        'D:resourcetype': { 'D:collection': {} },
-        'D:getlastmodified': 'Mon, 01 Jan 2023 12:00:00 GMT',
-      };
+  describe('propertiesToStats', () => {
+    it('should convert properties to Stats', () => {
+      const stats = propertiesToStats('/file.txt', { resourceType: 'file', size: 123, createdAt: new Date(), lastModified: new Date(), mimeType: 'text/plain', etag: 'abc' });
+      expect(stats.name).toBe('file.txt');
+      expect(stats.isFile).toBe(true);
+      expect(stats.size).toBe(123);
+    });
+  });
 
-      const name = 'folder';
-      const stats = extractStatsFromProps(props, name);
+  describe('parseXml', () => {
+    it('should parse xml string to Document', () => {
+      const xml = '<root><item>1</item></root>';
+      const doc = parseXml(xml);
+      expect(doc).toBeDefined();
+    });
+  });
 
-      expect(stats).toHaveProperty('name', 'folder');
-      expect(stats).toHaveProperty('isDirectory', true);
-      expect(stats).toHaveProperty('size', 0);
-      expect(stats).toHaveProperty('lastModified');
-      expect(stats.lastModified).toBeInstanceOf(Date);
-      expect(stats).toHaveProperty('contentType', '');
+  describe('isSuccessStatus', () => {
+    it('should check status code', () => {
+      expect(isSuccessStatus(200)).toBe(true);
+      expect(isSuccessStatus(299)).toBe(true);
+      expect(isSuccessStatus(300)).toBe(false);
+      expect(isSuccessStatus(404)).toBe(false);
+    });
+  });
+
+  describe('extractPathFromUrl', () => {
+    it('should extract path from url', () => {
+      expect(extractPathFromUrl('http://a.com/path/file', 'http://a.com')).toBe('/path/file');
+    });
+  });
+
+  describe('createTimeoutPromise', () => {
+    it('should reject after timeout', async () => {
+      await expect(createTimeoutPromise(10)).rejects.toThrow();
+    });
+  });
+
+  describe('createAbortController', () => {
+    it('should create AbortController or undefined', () => {
+      const ctrl = createAbortController();
+      expect(ctrl === undefined || typeof ctrl.abort === 'function').toBe(true);
+    });
+  });
+
+  describe('isBlobSupported', () => {
+    it('should return boolean', () => {
+      expect(typeof isBlobSupported()).toBe('boolean');
+    });
+  });
+
+  describe('isArrayBufferSupported', () => {
+    it('should return boolean', () => {
+      expect(typeof isArrayBufferSupported()).toBe('boolean');
+    });
+  });
+
+  describe('toArrayBuffer', () => {
+    it('should convert string to ArrayBuffer', async () => {
+      const ab = await toArrayBuffer('abc');
+      expect(ab.constructor.name).toBe('ArrayBuffer');
+      // 取实际有效长度
+      const view = new Uint8Array(ab);
+      // 查找 'a' 的 ASCII 码 97 的所有索引，找到连续 [97,98,99]
+      let found = false;
+      for (let i = 0; i <= view.length - 3; i++) {
+        if (view[i] === 97 && view[i + 1] === 98 && view[i + 2] === 99) {
+          found = true;
+          break;
+        }
+      }
+      expect(found).toBe(true);
+    });
+  });
+
+  describe('arrayBufferToString', () => {
+    it('should convert ArrayBuffer to string', () => {
+      // Node.js 环境下补充 TextEncoder
+      let encoder: any;
+      if (typeof TextEncoder === 'undefined') {
+        encoder = require('util').TextEncoder;
+      } else {
+        encoder = TextEncoder;
+      }
+      const ab = new encoder().encode('abc').buffer;
+      expect(arrayBufferToString(ab)).toBe('abc');
+    });
+  });
+
+  describe('getContentType', () => {
+    it('should return correct content type', () => {
+      expect(getContentType('a.txt')).toBe('text/plain');
+      expect(getContentType('a.json')).toBe('application/json');
+      expect(getContentType('a.unknown')).toBe('application/octet-stream');
+    });
+  });
+
+  describe('getDirFromPath', () => {
+    it('should get dir from path', () => {
+      expect(getDirFromPath('/a/b/c')).toBe('/a/b');
+      expect(getDirFromPath('/a')).toBe('/');
+      expect(getDirFromPath('/')).toBe('/');
+    });
+  });
+
+  describe('parseWebDAVXml', () => {
+    it('should parse WebDAV PROPFIND xml', () => {
+      const xml = `<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"><d:response><d:href>/file.txt</d:href><d:propstat><d:prop><d:getcontentlength>123</d:getcontentlength><d:getlastmodified>Mon, 01 Jan 2023 12:00:00 GMT</d:getlastmodified></d:prop></d:propstat></d:response></d:multistatus>`;
+      const stats = parseWebDAVXml(xml, '/');
+      expect(stats.length).toBeGreaterThan(0);
+      expect(stats[0].name).toBe('file.txt');
+      expect(stats[0].size).toBe(123);
     });
   });
 });

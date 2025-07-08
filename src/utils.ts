@@ -1,7 +1,8 @@
 import { WebDAVNamespace, WebDAVPropName, WebDAVResourceType } from './constants';
 import { Stats } from './types';
 import { Dirent } from 'fs';
-import { WebDAVError } from './WebDAVError';
+import { WebDAVError } from './errors';
+import { XMLParser } from 'fast-xml-parser'
 
 /**
  * 规范化路径，确保以 / 开头，不以 / 结尾（除非是根路径）
@@ -13,36 +14,36 @@ export function normalizePath(path: string): string {
   if (!path.startsWith('/')) {
     path = '/' + path;
   }
-  
+  // 合并多个连续的斜杠为一个
+  path = path.replace(/\/+/g, '/');
   // 如果不是根路径，则确保不以 / 结尾
   if (path.length > 1 && path.endsWith('/')) {
     path = path.slice(0, -1);
   }
-  
   return path;
 }
 
-/**
- * 连接路径
- * @param base 基础路径
- * @param paths 要连接的路径
- * @returns 连接后的路径
- */
-export function joinPaths(base: string, ...paths: string[]): string {
-  let result = base;
+// /**
+//  * 连接路径
+//  * @param base 基础路径
+//  * @param paths 要连接的路径
+//  * @returns 连接后的路径
+//  */
+// export function joinPaths(base: string, ...paths: string[]): string {
+//   let result = base;
   
-  for (const path of paths) {
-    if (!path) continue;
+//   for (const path of paths) {
+//     if (!path) continue;
     
-    if (result.endsWith('/')) {
-      result = result + (path.startsWith('/') ? path.slice(1) : path);
-    } else {
-      result = result + (path.startsWith('/') ? path : '/' + path);
-    }
-  }
+//     if (result.endsWith('/')) {
+//       result = result + (path.startsWith('/') ? path.slice(1) : path);
+//     } else {
+//       result = result + (path.startsWith('/') ? path : '/' + path);
+//     }
+//   }
   
-  return normalizePath(result);
-}
+//   return normalizePath(result);
+// }
 
 /**
  * 获取路径的父目录
@@ -421,4 +422,132 @@ export function arrayBufferToString(buffer: ArrayBuffer, encoding: string = 'utf
   } else {
     throw new WebDAVError('无法将 ArrayBuffer 转换为字符串，当前环境不支持 TextDecoder 或 Buffer');
   }
+}
+
+/**
+ * 根据文件名获取Content-Type
+ * @param filename 文件名
+ * @returns Content-Type字符串
+ */
+export function getContentType(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase();
+  switch (ext) {
+    case 'txt': return 'text/plain';
+    case 'html': case 'htm': return 'text/html';
+    case 'json': return 'application/json';
+    case 'xml': return 'application/xml';
+    case 'jpg': case 'jpeg': return 'image/jpeg';
+    case 'png': return 'image/png';
+    case 'gif': return 'image/gif';
+    case 'pdf': return 'application/pdf';
+    case 'csv': return 'text/csv';
+    case 'js': return 'application/javascript';
+    case 'css': return 'text/css';
+    case 'zip': return 'application/zip';
+    default: return 'application/octet-stream';
+  }
+}
+
+// 获取路径的父目录
+export function getDirFromPath(path: string): string {
+  if (!path || path === '/') return '/';
+  const normalized = path.replace(/\/+$/, '');
+  const idx = normalized.lastIndexOf('/');
+  if (idx <= 0) return '/';
+  return normalized.slice(0, idx) || '/';
+}
+
+/**
+ * 解析WebDAV PROPFIND XML响应，返回文件/目录信息数组
+ * @param xml XML字符串
+ * @param basePath 基础路径
+ * @returns Stats[]
+ */
+
+export function parseWebDAVXml(xml: string, basePath: string): Stats[] {
+  // 简单实现，实际可用 xml2js、fast-xml-parser 等库解析
+  // 这里只做最基础的兼容，建议根据实际WebDAV响应完善
+  const decode = require('he').decode;
+  const result: Stats[] = [];
+  if (!xml) return result;
+  const options = {
+    ignoreAttributes: false,
+    attributeNamePrefix: '',
+    textNodeName: 'value',
+    parseAttributeValue: true,
+    tagValueProcessor: (val: string) => decode(val),
+  };
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: "@_",
+    trimValues: true
+  });
+  const json = parser.parse(xml);
+  const responses = json['d:multistatus']?.['d:response'] || [];
+  const arr = Array.isArray(responses) ? responses : [responses];
+  const isBasePathFile = basePath && !basePath.endsWith('/');
+
+  for (const item of arr) {
+    const href = decode(item['d:href'] || '');
+    const propstat = item['d:propstat'] || item['d:prop'] || {};
+    const prop = propstat['d:prop'] || propstat;
+    const isDirectory = !!(prop['d:resourcetype'] && prop['d:resourcetype']['d:collection'] !== undefined);
+
+    // 如果basePath是文件，则直接取文件名，否则去除basePath前缀
+    let name: string;
+    if (isBasePathFile) {
+      name = href.split('/').filter(Boolean).pop() || '';
+    } else {
+      name = href.replace(basePath, '').replace(/^\//, '').replace(/\/$/, '');
+    }
+    if (!name) continue;
+    result.push({
+      path: href,
+      name,
+      isDirectory,
+      isFile: !isDirectory,
+      size: parseInt(prop['d:getcontentlength'] || '0', 10),
+      lastModified: prop['d:getlastmodified'] ? new Date(prop['d:getlastmodified']) : undefined,
+    });
+  }
+  return result;
+}
+
+/**
+ * 拼接URL路径，自动处理斜杠
+ * @param base 基础URL
+ * @param paths 追加的路径
+ * @returns 拼接后的URL
+ */
+export function joinUrl(base: string, ...paths: string[]): string {
+  let url = base;
+  let basePath = '';
+  try {
+    const u = new URL(base);
+    basePath = u.pathname.replace(/\/+$/, '');
+  } catch {
+    basePath = base.startsWith('/') ? base.replace(/\/+$/, '') : '';
+  }
+  // 只处理第一个 path，只去除与 basePath 第一部分相同的部分
+  if (paths.length > 0 && basePath) {
+    let p = paths[0];
+    if (p) {
+      // 取 basePath 的第一部分
+      const baseFirst = basePath.split('/').filter(Boolean)[0];
+      const pParts = p.split('/').filter(Boolean);
+      if (baseFirst && pParts[0] === baseFirst) {
+        pParts.shift();
+        p = pParts.join('/');
+        if (p && !p.startsWith('/')) p = '/' + p;
+        paths[0] = p;
+      }
+    }
+  }
+  for (let p of paths) {
+    if (!p) continue;
+    if (!url.endsWith('/')) url += '/';
+    url += p.startsWith('/') ? p.slice(1) : p;
+  }
+  url = url.replace(/([^:]\/)\/+/g, '$1');
+  return url;
 }

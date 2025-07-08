@@ -10,14 +10,27 @@ export class WebDAVError extends Error {
    * HTTP状态码
    */
   statusCode?: number;
+  /**
+   * 原始错误对象（如果有）
+   */
+  originalError?: Error;
 
-  constructor(message: string, statusCode?: number) {
+  constructor(message: string, statusCode?: number, originalError?: Error) {
     super(message);
     this.name = 'WebDAVError';
     this.statusCode = statusCode;
-    
-    // 兼容ES5
+    this.originalError = originalError;
     Object.setPrototypeOf(this, WebDAVError.prototype);
+    // 捕获堆栈跟踪（仅在 V8 引擎中有效）
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, WebDAVError);
+    }
+  }
+  /**
+   * 兼容 status 字段
+   */
+  get status() {
+    return this.statusCode;
   }
 }
 
@@ -26,10 +39,8 @@ export class WebDAVError extends Error {
  */
 export class NotFoundError extends WebDAVError {
   constructor(path: string) {
-    super(`File or directory not found: ${path}`, 404);
+    super(`文件未找到: ${path}`, 404);
     this.name = 'NotFoundError';
-    
-    // 兼容ES5
     Object.setPrototypeOf(this, NotFoundError.prototype);
   }
 }
@@ -38,11 +49,9 @@ export class NotFoundError extends WebDAVError {
  * 认证错误
  */
 export class AuthenticationError extends WebDAVError {
-  constructor(message: string = 'Authentication failed') {
+  constructor(message: string = '认证失败') {
     super(message, 401);
     this.name = 'AuthenticationError';
-    
-    // 兼容ES5
     Object.setPrototypeOf(this, AuthenticationError.prototype);
   }
 }
@@ -51,11 +60,9 @@ export class AuthenticationError extends WebDAVError {
  * 授权错误
  */
 export class AuthorizationError extends WebDAVError {
-  constructor(message: string = 'Not authorized to access this resource') {
+  constructor(message: string = '权限被拒绝') {
     super(message, 403);
     this.name = 'AuthorizationError';
-    
-    // 兼容ES5
     Object.setPrototypeOf(this, AuthorizationError.prototype);
   }
 }
@@ -64,11 +71,9 @@ export class AuthorizationError extends WebDAVError {
  * 服务器错误
  */
 export class ServerError extends WebDAVError {
-  constructor(message: string = 'Server error', statusCode: number = 500) {
+  constructor(message: string = '服务器错误', statusCode: number = 500) {
     super(message, statusCode);
     this.name = 'ServerError';
-    
-    // 兼容ES5
     Object.setPrototypeOf(this, ServerError.prototype);
   }
 }
@@ -78,10 +83,8 @@ export class ServerError extends WebDAVError {
  */
 export class FileExistsError extends WebDAVError {
   constructor(path: string) {
-    super(`File already exists: ${path}`, 412);
+    super(`文件已存在: ${path}`, 412);
     this.name = 'FileExistsError';
-    
-    // 兼容ES5
     Object.setPrototypeOf(this, FileExistsError.prototype);
   }
 }
@@ -90,11 +93,9 @@ export class FileExistsError extends WebDAVError {
  * 锁定错误
  */
 export class LockError extends WebDAVError {
-  constructor(path: string, message: string = 'Resource is locked') {
+  constructor(path: string, message: string = '资源被锁定') {
     super(`${message}: ${path}`, 423);
     this.name = 'LockError';
-    
-    // 兼容ES5
     Object.setPrototypeOf(this, LockError.prototype);
   }
 }
@@ -103,11 +104,9 @@ export class LockError extends WebDAVError {
  * 超时错误
  */
 export class TimeoutError extends WebDAVError {
-  constructor(message: string = 'Request timed out') {
+  constructor(message: string = '连接超时') {
     super(message, 408);
     this.name = 'TimeoutError';
-    
-    // 兼容ES5
     Object.setPrototypeOf(this, TimeoutError.prototype);
   }
 }
@@ -116,11 +115,9 @@ export class TimeoutError extends WebDAVError {
  * 网络错误
  */
 export class NetworkError extends WebDAVError {
-  constructor(message: string = 'Network error occurred') {
-    super(message);
+  constructor(originalError?: Error, message: string = '网络错误') {
+    super(originalError ? `${message}: ${originalError.message}` : message, 0, originalError);
     this.name = 'NetworkError';
-    
-    // 兼容ES5
     Object.setPrototypeOf(this, NetworkError.prototype);
   }
 }
@@ -130,10 +127,8 @@ export class NetworkError extends WebDAVError {
  */
 export class ArgumentError extends WebDAVError {
   constructor(message: string) {
-    super(message);
+    super(`无效参数: ${message}`);
     this.name = 'ArgumentError';
-    
-    // 兼容ES5
     Object.setPrototypeOf(this, ArgumentError.prototype);
   }
 }

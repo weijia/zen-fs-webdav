@@ -55,7 +55,7 @@ afterAll(async () => {
   }
 
   try {
-    await webdavFs.rmdir(testDir, { recursive: true });
+    await webdavFs.rmdir(testDir, { recursive: true, force: true });
   } catch (error) {
     console.error('Failed to clean up test directory:', error);
   }
@@ -135,12 +135,12 @@ describe('WebDAVFS Integration Tests', () => {
     expect(files[0].isDirectory).toBe(true);
 
     // 删除子目录
-    await webdavFs.rmdir(subDirPath);
+    await webdavFs.rmdir(subDirPath, { force: true });
     const subDirExistsAfterDelete = await webdavFs.exists(subDirPath);
     expect(subDirExistsAfterDelete).toBe(false);
 
     // 删除父目录
-    await webdavFs.rmdir(dirPath);
+    await webdavFs.rmdir(dirPath, { force: true });
     const dirExistsAfterDelete = await webdavFs.exists(dirPath);
     expect(dirExistsAfterDelete).toBe(false);
   });
@@ -206,7 +206,7 @@ describe('WebDAVFS Integration Tests', () => {
       .toThrow(WebDAVError);
 
     // 清理
-    await webdavFs.rmdir(dirPath);
+    await webdavFs.rmdir(dirPath, { force: true });
   });
 
   conditionalTest('should handle recursive directory operations', async () => {
@@ -222,7 +222,7 @@ describe('WebDAVFS Integration Tests', () => {
     await webdavFs.writeFile(filePath2, 'File 2');
 
     // 递归删除目录
-    await webdavFs.rmdir(dirPath, { recursive: true });
+    await webdavFs.rmdir(dirPath, { recursive: true, force: true });
 
     // 验证目录及其内容已被删除
     const dirExists = await webdavFs.exists(dirPath);
@@ -248,3 +248,4 @@ describe('WebDAVFS Integration Tests', () => {
     await webdavFs.deleteFile(specialFileName);
   });
 });
+

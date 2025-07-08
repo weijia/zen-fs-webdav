@@ -28,13 +28,11 @@ import {
 
 import {
   normalizePath,
-  joinPaths as joinUrl,
-  getFilenameFromPath,
+  joinUrl,
   getDirFromPath,
   parseWebDAVXml,
   createBasicAuthHeader,
   getContentType,
-  SimpleCache,
 } from './utils';
 
 /**
@@ -45,8 +43,6 @@ export class WebDAVFS implements WebDAVFileSystem {
   private auth?: { username: string; password: string };
   private timeout: number;
   private headers: Record<string, string>;
-  private cache?: SimpleCache;
-  private cacheTime: number;
 
   /**
    * 创建WebDAV文件系统实例
@@ -60,14 +56,13 @@ export class WebDAVFS implements WebDAVFileSystem {
     this.baseUrl = options.baseUrl.endsWith('/') 
       ? options.baseUrl.slice(0, -1) 
       : options.baseUrl;
-    this.auth = options.auth;
+    if (options.username && options.password) {
+      this.auth = { username: options.username, password: options.password };
+    } else {
+      this.auth = undefined;
+    }
     this.timeout = options.timeout || 30000;
     this.headers = options.headers || {};
-    this.cacheTime = options.cacheTime || 300000; // 默认5分钟
-
-    if (options.cache) {
-      this.cache = new SimpleCache();
-    }
   }
 
   /**
@@ -157,7 +152,7 @@ export class WebDAVFS implements WebDAVFileSystem {
       if (error.name === 'AbortError') {
         throw new TimeoutError(`请求超时: ${url}`);
       } else {
-        throw new NetworkError(`网络错误: ${error.message}`);
+        throw new NetworkError(error, `网络错误: ${error.message}`);
       }
     }
   }
@@ -191,15 +186,6 @@ export class WebDAVFS implements WebDAVFileSystem {
    */
   async readFile(path: string, options: ReadFileOptions = {}): Promise<Buffer | string> {
     const normalizedPath = normalizePath(path);
-    const cacheKey = `readFile:${normalizedPath}`;
-    
-    // 检查缓存
-    if (this.cache && options.useCache !== false) {
-      const cachedData = this.cache.get(cacheKey);
-      if (cachedData) {
-        return options.encoding ? cachedData.toString(options.encoding) : cachedData;
-      }
-    }
     
     try {
       const response = await this.request('GET', normalizedPath, {
@@ -212,17 +198,20 @@ export class WebDAVFS implements WebDAVFileSystem {
       }
       
       // 创建Buffer
-      const buffer = typeof Buffer !== 'undefined' 
-        ? Buffer.from(response.data) 
-        : new Uint8Array(response.data);
-      
-      // 缓存结果
-      if (this.cache) {
-        this.cache.set(cacheKey, buffer, this.cacheTime);
+      let buffer: Buffer;
+      if (typeof Buffer !== 'undefined') {
+        buffer = Buffer.from(response.data);
+      } else {
+        // @ts-ignore
+        buffer = Buffer.from(new Uint8Array(response.data));
       }
-      
+
       // 根据编码返回字符串或Buffer
-      return options.encoding ? buffer.toString(options.encoding) : buffer;
+      if (options.encoding) {
+        return buffer.toString(options.encoding as BufferEncoding);
+      } else {
+        return buffer;
+      }
     } catch (error: any) {
       if (error instanceof WebDAVError) {
         throw error;
@@ -244,8 +233,11 @@ export class WebDAVFS implements WebDAVFileSystem {
     options: WriteFileOptions = {}
   ): Promise<WebDAVResult> {
     const normalizedPath = normalizePath(path);
+    const getFilenameFromPath = (p: string) => {
+      const parts = p.split('/');
+      return parts[parts.length - 1] || '';
+    };
     const contentType = options.contentType || getContentType(getFilenameFromPath(normalizedPath));
-    
     // 检查文件是否存在（如果不允许覆盖）
     if (options.overwrite === false) {
       const exists = await this.exists(normalizedPath);
@@ -257,7 +249,6 @@ export class WebDAVFS implements WebDAVFileSystem {
     // 准备请求头
     const headers = {
       'Content-Type': contentType,
-      ...options.headers,
     };
     
     try {
@@ -270,13 +261,6 @@ export class WebDAVFS implements WebDAVFileSystem {
         this.handleResponseError(response.status, normalizedPath);
       }
       
-      // 清除缓存
-      if (this.cache) {
-        this.cache.delete(`readFile:${normalizedPath}`);
-        this.cache.delete(`stat:${normalizedPath}`);
-        this.cache.delete(`readDir:${getDirFromPath(normalizedPath)}`);
-      }
-      
       return {
         success: response.status >= 200 && response.status < 300,
         statusCode: response.status,
@@ -285,7 +269,7 @@ export class WebDAVFS implements WebDAVFileSystem {
       if (error instanceof WebDAVError) {
         throw error;
       }
-      throw new WebDAVError(`写入文件失败: ${normalizedPath}`, undefined, error);
+      throw new WebDAVError(`写入文件失败: ${normalizedPath}`);
     }
   }
 
@@ -310,13 +294,6 @@ export class WebDAVFS implements WebDAVFileSystem {
         this.handleResponseError(response.status, normalizedPath);
       }
       
-      // 清除缓存
-      if (this.cache) {
-        this.cache.delete(`readFile:${normalizedPath}`);
-        this.cache.delete(`stat:${normalizedPath}`);
-        this.cache.delete(`readDir:${getDirFromPath(normalizedPath)}`);
-      }
-      
       return {
         success: response.status >= 200 && response.status < 300,
         statusCode: response.status,
@@ -337,15 +314,6 @@ export class WebDAVFS implements WebDAVFileSystem {
    */
   async readDir(path: string, options: ReaddirOptions = {}): Promise<Stats[]> {
     const normalizedPath = normalizePath(path);
-    const cacheKey = `readDir:${normalizedPath}`;
-    
-    // 检查缓存
-    if (this.cache && options.useCache !== false) {
-      const cachedData = this.cache.get(cacheKey);
-      if (cachedData) {
-        return cachedData;
-      }
-    }
     
     try {
       // 准备PROPFIND请求
@@ -380,17 +348,12 @@ export class WebDAVFS implements WebDAVFileSystem {
         return true;
       });
       
-      // 缓存结果
-      if (this.cache) {
-        this.cache.set(cacheKey, result, this.cacheTime);
-      }
-      
       return result;
     } catch (error: any) {
       if (error instanceof WebDAVError) {
         throw error;
       }
-      throw new WebDAVError(`读取目录失败: ${normalizedPath}`, undefined, error);
+      throw new WebDAVError(`读取目录失败: ${normalizedPath}`);
     }
   }
 
@@ -400,7 +363,7 @@ export class WebDAVFS implements WebDAVFileSystem {
    * @param options 创建选项
    * @returns 操作结果
    */
-  async mkdir(path: string, options: MkdirOptions = {}): Promise<WebDAVResult> {
+  async mkdir(path: string, options: MkdirOptions = {}): Promise<void> {
     const normalizedPath = normalizePath(path);
     
     try {
@@ -408,7 +371,7 @@ export class WebDAVFS implements WebDAVFileSystem {
       try {
         const stat = await this.stat(normalizedPath);
         if (stat.isDirectory) {
-          return { success: true }; // 目录已存在，视为成功
+          return; // 目录已存在，视为成功
         }
         throw new FileExistsError(normalizedPath); // 路径存在但不是目录
       } catch (error) {
@@ -441,71 +404,82 @@ export class WebDAVFS implements WebDAVFileSystem {
         this.handleResponseError(response.status, normalizedPath);
       }
       
-      // 清除缓存
-      if (this.cache) {
-        this.cache.delete(`stat:${normalizedPath}`);
-        this.cache.delete(`readDir:${getDirFromPath(normalizedPath)}`);
-      }
-      
-      return {
-        success: response.status >= 200 && response.status < 300,
-        statusCode: response.status,
-      };
+      return;
     } catch (error: any) {
       if (error instanceof WebDAVError) {
         throw error;
       }
-      throw new WebDAVError(`创建目录失败: ${normalizedPath}`, undefined, error);
+      throw new WebDAVError(`创建目录失败: ${normalizedPath}`);
     }
   }
 
   /**
-   * 删除目录
-   * @param path 目录路径
-   * @param recursive 是否递归删除
+   * 删除文件或目录，行为类似于 Node.js 的 fs.rm
+   * @param path 路径
+   * @param options { recursive?: boolean, force?: boolean }
+   */
+  async rm(path: string, options?: { recursive?: boolean, force?: boolean }) {
+    const { recursive = false, force = false } = options || {};
+    try {
+      const stat = await this.stat(path);
+      if (stat.isDirectory) {
+        if (recursive) {
+          // 递归删除目录内容
+          const files = await this.readDir(path);
+          for (const file of files) {
+            const childPath = path.replace(/\/$/, '') + '/' + file.name;
+            await this.rm(childPath, { recursive: true, force });
+          }
+        } else {
+          // 非递归时，目录必须为空
+          const files = await this.readDir(path);
+          if (files.length > 0) {
+            throw new WebDAVError(`Directory not empty: ${path}`);
+          }
+        }
+      }
+      // 删除文件或空目录
+      await this._delete(path);
+    } catch (err: any) {
+      if (force && (err.code === 'ENOENT' || err.status === 404)) {
+        // force=true 时忽略不存在
+        return;
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * 兼容旧的 rmdir 方法，内部重定向到 rm
+   * @deprecated 请使用 rm
+   */
+  async rmdir(path: string, options?: boolean | { recursive?: boolean, force?: boolean }) {
+    // 兼容 boolean 递归参数
+    let opts: { recursive?: boolean, force?: boolean } = {};
+    if (typeof options === 'boolean') {
+      opts.recursive = options;
+    } else if (typeof options === 'object' && options !== null) {
+      opts = options;
+    }
+    return this.rm(path, opts);
+  }
+
+  /**
+   * 删除文件或目录
+   * @param path 文件或目录路径
    * @returns 操作结果
    */
-  async rmdir(path: string, recursive = false): Promise<WebDAVResult> {
+  private async _delete(path: string) {
+    // 实现 WebDAV DELETE 请求
     const normalizedPath = normalizePath(path);
     
     try {
-      // 确保是目录而不是文件
-      const stat = await this.stat(normalizedPath);
-      if (!stat.isDirectory) {
-        throw new ArgumentError(`路径指向一个文件，请使用deleteFile方法: ${normalizedPath}`);
-      }
-      
-      // 如果是递归删除，需要先删除所有子文件和子目录
-      if (recursive) {
-        const children = await this.readDir(normalizedPath, { recursive: false });
-        
-        for (const child of children) {
-          if (child.isDirectory) {
-            await this.rmdir(`${normalizedPath}/${child.name}`, true);
-          } else {
-            await this.deleteFile(`${normalizedPath}/${child.name}`);
-          }
-        }
-      } else {
-        // 检查目录是否为空
-        const children = await this.readDir(normalizedPath);
-        if (children.length > 0) {
-          throw new WebDAVError(`目录不为空: ${normalizedPath}`);
-        }
-      }
-      
       const response = await this.request('DELETE', normalizedPath);
       
       if (response.status >= 400) {
         this.handleResponseError(response.status, normalizedPath);
       }
       
-      // 清除缓存
-      if (this.cache) {
-        this.cache.delete(`stat:${normalizedPath}`);
-        this.cache.delete(`readDir:${getDirFromPath(normalizedPath)}`);
-      }
-      
       return {
         success: response.status >= 200 && response.status < 300,
         statusCode: response.status,
@@ -514,7 +488,7 @@ export class WebDAVFS implements WebDAVFileSystem {
       if (error instanceof WebDAVError) {
         throw error;
       }
-      throw new WebDAVError(`删除目录失败: ${normalizedPath}`, undefined, error);
+      throw new WebDAVError(`删除失败: ${normalizedPath}`, undefined, error);
     }
   }
 
@@ -525,15 +499,6 @@ export class WebDAVFS implements WebDAVFileSystem {
    */
   async stat(path: string): Promise<Stats> {
     const normalizedPath = normalizePath(path);
-    const cacheKey = `stat:${normalizedPath}`;
-    
-    // 检查缓存
-    if (this.cache) {
-      const cachedData = this.cache.get(cacheKey);
-      if (cachedData) {
-        return cachedData;
-      }
-    }
     
     try {
       // 准备PROPFIND请求
@@ -560,11 +525,6 @@ export class WebDAVFS implements WebDAVFileSystem {
       }
       
       const stat = files[0];
-      
-      // 缓存结果
-      if (this.cache) {
-        this.cache.set(cacheKey, stat, this.cacheTime);
-      }
       
       return stat;
     } catch (error: any) {
@@ -629,13 +589,6 @@ export class WebDAVFS implements WebDAVFileSystem {
         this.handleResponseError(response.status, normalizedSource);
       }
       
-      // 清除缓存
-      if (this.cache) {
-        this.cache.delete(`readFile:${normalizedDestination}`);
-        this.cache.delete(`stat:${normalizedDestination}`);
-        this.cache.delete(`readDir:${getDirFromPath(normalizedDestination)}`);
-      }
-      
       return {
         success: response.status >= 200 && response.status < 300,
         statusCode: response.status,
@@ -685,16 +638,6 @@ export class WebDAVFS implements WebDAVFileSystem {
         this.handleResponseError(response.status, normalizedSource);
       }
       
-      // 清除缓存
-      if (this.cache) {
-        this.cache.delete(`readFile:${normalizedSource}`);
-        this.cache.delete(`stat:${normalizedSource}`);
-        this.cache.delete(`readDir:${getDirFromPath(normalizedSource)}`);
-        this.cache.delete(`readFile:${normalizedDestination}`);
-        this.cache.delete(`stat:${normalizedDestination}`);
-        this.cache.delete(`readDir:${getDirFromPath(normalizedDestination)}`);
-      }
-      
       return {
         success: response.status >= 200 && response.status < 300,
         statusCode: response.status,
@@ -706,3 +649,12 @@ export class WebDAVFS implements WebDAVFileSystem {
       throw new WebDAVError(`移动失败: ${normalizedSource} -> ${normalizedDestination}`, undefined, error);
     }
   }
+
+  /**
+   * 删除文件（fs/unlink 兼容方法）
+   * @param path 文件路径
+   */
+  async unlink(path: string): Promise<void> {
+    await this.deleteFile(path);
+  }
+}
