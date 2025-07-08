@@ -29,7 +29,7 @@ yarn add zen-fs-webdav
 import { WebDAVFileSystem } from 'zen-fs-webdav';
 
 // 创建 WebDAV 客户端实例
-const fs = new WebDAVFileSystem({
+const fs = createWebDAVFileSystem({
   baseUrl: 'https://example.com/webdav',
   username: 'user',
   password: 'pass',
