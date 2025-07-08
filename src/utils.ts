@@ -483,15 +483,27 @@ export function parseWebDAVXml(xml: string, basePath: string): Stats[] {
     trimValues: true
   });
   const json = parser.parse(xml);
-  const responses = json['d:multistatus']?.['d:response'] || [];
+  // 兼容不同大小写的 multistatus/response 属性
+  function getCaseInsensitive(obj: any, ...keys: string[]): any {
+    if (!obj) return undefined;
+    for (const key of keys) {
+      if (obj[key] !== undefined) return obj[key];
+      const found = Object.keys(obj).find(k => k.toLowerCase() === key.toLowerCase());
+      if (found) return obj[found];
+    }
+    return undefined;
+  }
+  const multistatus = getCaseInsensitive(json, 'd:multistatus', 'multistatus');
+  const responses = getCaseInsensitive(multistatus, 'd:response', 'response') || [];
   const arr = Array.isArray(responses) ? responses : [responses];
   const isBasePathFile = basePath && !basePath.endsWith('/');
-
   for (const item of arr) {
-    const href = decode(item['d:href'] || '');
-    const propstat = item['d:propstat'] || item['d:prop'] || {};
-    const prop = propstat['d:prop'] || propstat;
-    const isDirectory = !!(prop['d:resourcetype'] && prop['d:resourcetype']['d:collection'] !== undefined);
+    const href = decode(getCaseInsensitive(item, 'd:href', 'href') || '');
+    const propstat = getCaseInsensitive(item, 'd:propstat', 'propstat', 'd:prop', 'prop') || {};
+    const prop = getCaseInsensitive(propstat, 'd:prop', 'prop') || propstat;
+    const resourcetype = getCaseInsensitive(prop, 'd:resourcetype', 'resourcetype');
+    const collection = resourcetype && getCaseInsensitive(resourcetype, 'd:collection', 'collection');
+    const isDirectory = !!(resourcetype && collection !== undefined);
 
     // 如果basePath是文件，则直接取文件名，否则去除basePath前缀
     let name: string;
@@ -506,8 +518,10 @@ export function parseWebDAVXml(xml: string, basePath: string): Stats[] {
       name,
       isDirectory,
       isFile: !isDirectory,
-      size: parseInt(prop['d:getcontentlength'] || '0', 10),
-      lastModified: prop['d:getlastmodified'] ? new Date(prop['d:getlastmodified']) : undefined,
+      size: parseInt(getCaseInsensitive(prop, 'd:getcontentlength', 'getcontentlength') || '0', 10),
+      lastModified: getCaseInsensitive(prop, 'd:getlastmodified', 'getlastmodified')
+        ? new Date(getCaseInsensitive(prop, 'd:getlastmodified', 'getlastmodified'))
+        : undefined,
     });
   }
   return result;
