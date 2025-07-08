@@ -244,7 +244,6 @@ try {
 │   ├── utils.ts - 工具函数
 │   ├── webdav-fs.ts - WebDAV 文件系统实现
 │   ├── webdav.ts - WebDAV 核心功能
-│   ├── WebDAVError.ts - WebDAV 错误类
 │   ├── WebDAVFileSystem.ts - WebDAV 文件系统类
 │   └── __tests__/ - 测试代码
 │       ├── errors.test.ts - 错误测试
@@ -252,15 +251,9 @@ try {
 │       ├── utils.test.ts - 工具函数测试
 │       ├── webdav-fs.test.ts - 文件系统测试
 │       └── WebDAVFileSystem.test.ts - 文件系统类测试
-├── tests/ - 测试代码
-│   ├── webdav.test.ts - WebDAV 测试
-│   └── WebDAVFileSystem.test.ts - 文件系统测试
 ├── tsconfig.json - TypeScript 配置
 ├── tsup.config.ts - Tsup 构建配置
-└── __tests__/ - 测试代码
-    ├── utils.test.ts - 工具函数测试
-    ├── webdav-fs.test.ts - 文件系统测试
-    └── WebDAVFileSystem.test.ts - 文件系统测试
+└── yarn.lock - Yarn 依赖锁定文件
 ```
 
 ## 许可证
