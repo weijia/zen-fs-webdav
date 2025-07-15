@@ -1,5 +1,4 @@
 import {
-  WebDAVOptions,
   Stats,
   ReadFileOptions,
   WriteFileOptions,

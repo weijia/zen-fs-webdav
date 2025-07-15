@@ -144,15 +144,15 @@ export class WebDAVFS implements WebDAVFileSystem {
         status: response.status,
         headers: responseHeaders,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // 清除超时
       if (timeoutId) clearTimeout(timeoutId);
       
       // 处理错误
-      if (error.name === 'AbortError') {
+      if ((error as Error).name === 'AbortError') {
         throw new TimeoutError(`请求超时: ${url}`);
       } else {
-        throw new NetworkError(error, `网络错误: ${error.message}`);
+        throw new NetworkError(error, `网络错误: ${(error as Error).message}`);
       }
     }
   }
@@ -202,7 +202,6 @@ export class WebDAVFS implements WebDAVFileSystem {
       if (typeof Buffer !== 'undefined') {
         buffer = Buffer.from(response.data);
       } else {
-        // @ts-ignore
         buffer = Buffer.from(new Uint8Array(response.data));
       }
 
@@ -212,7 +211,7 @@ export class WebDAVFS implements WebDAVFileSystem {
       } else {
         return buffer;
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof WebDAVError) {
         throw error;
       }
@@ -265,7 +264,7 @@ export class WebDAVFS implements WebDAVFileSystem {
         success: response.status >= 200 && response.status < 300,
         statusCode: response.status,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof WebDAVError) {
         throw error;
       }
@@ -298,7 +297,7 @@ export class WebDAVFS implements WebDAVFileSystem {
         success: response.status >= 200 && response.status < 300,
         statusCode: response.status,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof WebDAVError) {
         throw error;
       }
@@ -334,7 +333,7 @@ export class WebDAVFS implements WebDAVFileSystem {
       const files = parseWebDAVXml(response.data, normalizedPath);
       
       // 过滤结果
-      let result = files.filter(file => {
+      const result = files.filter(file => {
         // 排除当前目录
         if (file.path === normalizedPath) {
           return false;
@@ -349,7 +348,7 @@ export class WebDAVFS implements WebDAVFileSystem {
       });
       
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof WebDAVError) {
         throw error;
       }
@@ -405,7 +404,7 @@ export class WebDAVFS implements WebDAVFileSystem {
       }
       
       return;
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof WebDAVError) {
         throw error;
       }
@@ -440,7 +439,7 @@ export class WebDAVFS implements WebDAVFileSystem {
       }
       // 删除文件或空目录
       await this._delete(path);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (force && (err.code === 'ENOENT' || err.status === 404)) {
         // force=true 时忽略不存在
         return;
@@ -484,7 +483,7 @@ export class WebDAVFS implements WebDAVFileSystem {
         success: response.status >= 200 && response.status < 300,
         statusCode: response.status,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof WebDAVError) {
         throw error;
       }
@@ -527,7 +526,7 @@ export class WebDAVFS implements WebDAVFileSystem {
       const stat = files[0];
       
       return stat;
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof WebDAVError) {
         throw error;
       }
@@ -593,7 +592,7 @@ export class WebDAVFS implements WebDAVFileSystem {
         success: response.status >= 200 && response.status < 300,
         statusCode: response.status,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof WebDAVError) {
         throw error;
       }
@@ -642,7 +641,7 @@ export class WebDAVFS implements WebDAVFileSystem {
         success: response.status >= 200 && response.status < 300,
         statusCode: response.status,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof WebDAVError) {
         throw error;
       }

@@ -1,6 +1,5 @@
 import { WebDAVNamespace, WebDAVPropName, WebDAVResourceType } from './constants';
 import { Stats } from './types';
-import { Dirent } from 'fs';
 import { WebDAVError } from './errors';
 import { XMLParser } from 'fast-xml-parser'
 
@@ -411,7 +410,7 @@ export async function toArrayBuffer(data: string | ArrayBuffer | Blob): Promise<
  * @param encoding 编码
  * @returns 字符串
  */
-export function arrayBufferToString(buffer: ArrayBuffer, encoding: string = 'utf-8'): string {
+export function arrayBufferToString(buffer: ArrayBuffer, encoding = 'utf-8'): string {
   if (typeof TextDecoder !== 'undefined') {
     // 浏览器环境
     const decoder = new TextDecoder(encoding);
@@ -470,13 +469,6 @@ export function parseWebDAVXml(xml: string, basePath: string): Stats[] {
   const decode = require('he').decode;
   const result: Stats[] = [];
   if (!xml) return result;
-  const options = {
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-    textNodeName: 'value',
-    parseAttributeValue: true,
-    tagValueProcessor: (val: string) => decode(val),
-  };
   const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: "@_",
@@ -484,12 +476,12 @@ export function parseWebDAVXml(xml: string, basePath: string): Stats[] {
   });
   const json = parser.parse(xml);
   // 兼容不同大小写的 multistatus/response 属性
-  function getCaseInsensitive(obj: any, ...keys: string[]): any {
+  function getCaseInsensitive(obj: unknown, ...keys: string[]): unknown {
     if (!obj) return undefined;
     for (const key of keys) {
-      if (obj[key] !== undefined) return obj[key];
+      if ((obj as Record<string, unknown>)[key] !== undefined) return (obj as Record<string, unknown>)[key];
       const found = Object.keys(obj).find(k => k.toLowerCase() === key.toLowerCase());
-      if (found) return obj[found];
+      if (found) return (obj as Record<string, unknown>)[found];
     }
     return undefined;
   }
@@ -518,9 +510,9 @@ export function parseWebDAVXml(xml: string, basePath: string): Stats[] {
       name,
       isDirectory,
       isFile: !isDirectory,
-      size: parseInt(getCaseInsensitive(prop, 'd:getcontentlength', 'getcontentlength') || '0', 10),
+      size: parseInt(String(getCaseInsensitive(prop, 'd:getcontentlength', 'getcontentlength') ?? '0'), 10),
       lastModified: getCaseInsensitive(prop, 'd:getlastmodified', 'getlastmodified')
-        ? new Date(getCaseInsensitive(prop, 'd:getlastmodified', 'getlastmodified'))
+        ? new Date(String(getCaseInsensitive(prop, 'd:getlastmodified', 'getlastmodified')))
         : undefined,
     });
   }
@@ -557,7 +549,7 @@ export function joinUrl(base: string, ...paths: string[]): string {
       }
     }
   }
-  for (let p of paths) {
+  for (const p of paths) {
     if (!p) continue;
     if (!url.endsWith('/')) url += '/';
     url += p.startsWith('/') ? p.slice(1) : p;

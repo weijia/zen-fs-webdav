@@ -9,28 +9,44 @@ export class WebDAVError extends Error {
   /**
    * HTTP状态码
    */
-  statusCode?: number;
+  status?: number;
   /**
    * 原始错误对象（如果有）
    */
-  originalError?: Error;
+  cause?: unknown;
 
-  constructor(message: string, statusCode?: number, originalError?: Error) {
+  constructor(message: string, status?: number, cause?: unknown) {
     super(message);
     this.name = 'WebDAVError';
-    this.statusCode = statusCode;
-    this.originalError = originalError;
+    this.status = status;
+    this.cause = cause;
+    // 兼容 TS 的 Error 子类
     Object.setPrototypeOf(this, WebDAVError.prototype);
-    // 捕获堆栈跟踪（仅在 V8 引擎中有效）
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, WebDAVError);
-    }
   }
-  /**
-   * 兼容 status 字段
-   */
-  get status() {
-    return this.statusCode;
+
+  toString(): string {
+    if (typeof this.status === 'number') {
+      return `${this.name}: ${this.message} (Status: ${this.status})`;
+    }
+    return `${this.name}: ${this.message}`;
+  }
+
+  static fromResponse(response: { status: number; statusText: string }, message?: string): WebDAVError {
+    const msg = message
+      ? `${message}: ${response.status} ${response.statusText}`
+      : `${response.status} ${response.statusText}`;
+    return new WebDAVError(msg, response.status);
+  }
+
+  static fromError(error: unknown): WebDAVError {
+    if (error instanceof WebDAVError) {
+      return error;
+    }
+    if (error instanceof Error) {
+      const msg = error.message || 'Unknown WebDAV error';
+      return new WebDAVError(msg, undefined, error);
+    }
+    return new WebDAVError('Unknown WebDAV error');
   }
 }
 
@@ -49,7 +65,7 @@ export class NotFoundError extends WebDAVError {
  * 认证错误
  */
 export class AuthenticationError extends WebDAVError {
-  constructor(message: string = '认证失败') {
+  constructor(message = '认证失败') {
     super(message, 401);
     this.name = 'AuthenticationError';
     Object.setPrototypeOf(this, AuthenticationError.prototype);
@@ -60,7 +76,7 @@ export class AuthenticationError extends WebDAVError {
  * 授权错误
  */
 export class AuthorizationError extends WebDAVError {
-  constructor(message: string = '权限被拒绝') {
+  constructor(message = '权限被拒绝') {
     super(message, 403);
     this.name = 'AuthorizationError';
     Object.setPrototypeOf(this, AuthorizationError.prototype);
@@ -71,7 +87,7 @@ export class AuthorizationError extends WebDAVError {
  * 服务器错误
  */
 export class ServerError extends WebDAVError {
-  constructor(message: string = '服务器错误', statusCode: number = 500) {
+  constructor(message = '服务器错误', statusCode = 500) {
     super(message, statusCode);
     this.name = 'ServerError';
     Object.setPrototypeOf(this, ServerError.prototype);
@@ -93,7 +109,7 @@ export class FileExistsError extends WebDAVError {
  * 锁定错误
  */
 export class LockError extends WebDAVError {
-  constructor(path: string, message: string = '资源被锁定') {
+  constructor(path: string, message = '资源被锁定') {
     super(`${message}: ${path}`, 423);
     this.name = 'LockError';
     Object.setPrototypeOf(this, LockError.prototype);
@@ -104,7 +120,7 @@ export class LockError extends WebDAVError {
  * 超时错误
  */
 export class TimeoutError extends WebDAVError {
-  constructor(message: string = '连接超时') {
+  constructor(message = '连接超时') {
     super(message, 408);
     this.name = 'TimeoutError';
     Object.setPrototypeOf(this, TimeoutError.prototype);
@@ -115,7 +131,7 @@ export class TimeoutError extends WebDAVError {
  * 网络错误
  */
 export class NetworkError extends WebDAVError {
-  constructor(originalError?: Error, message: string = '网络错误') {
+  constructor(originalError?: Error, message = '网络错误') {
     super(originalError ? `${message}: ${originalError.message}` : message, 0, originalError);
     this.name = 'NetworkError';
     Object.setPrototypeOf(this, NetworkError.prototype);

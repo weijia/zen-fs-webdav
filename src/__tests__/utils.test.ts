@@ -194,7 +194,7 @@ describe('Utils', () => {
   describe('arrayBufferToString', () => {
     it('should convert ArrayBuffer to string', () => {
       // Node.js 环境下补充 TextEncoder
-      let encoder: any;
+      let encoder: unknown;
       if (typeof TextEncoder === 'undefined') {
         encoder = require('util').TextEncoder;
       } else {

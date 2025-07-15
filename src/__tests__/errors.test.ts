@@ -78,7 +78,7 @@ describe('WebDAVError', () => {
   });
 
   it('should handle non-Error objects', () => {
-    const error = WebDAVError.fromError('Just a string' as any);
+    const error = WebDAVError.fromError('Just a string' as unknown);
     expect(error.message).toBe('Unknown WebDAV error');
   });
 });

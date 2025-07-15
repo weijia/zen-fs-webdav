@@ -259,5 +259,5 @@ export interface WebDAVResult {
   /**
    * 操作返回的数据（可选）
    */
-  data?: any;
+  data?: unknown;
 }
