@@ -149,10 +149,11 @@ export class WebDAVFS implements WebDAVFileSystem {
       if (timeoutId) clearTimeout(timeoutId);
       
       // 处理错误
-      if ((error as Error).name === 'AbortError') {
+      if (error instanceof Error && error.name === 'AbortError') {
         throw new TimeoutError(`请求超时: ${url}`);
       } else {
-        throw new NetworkError(error, `网络错误: ${(error as Error).message}`);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        throw new NetworkError(error instanceof Error ? error : new Error(String(error)), `网络错误: ${errorMessage}`);
       }
     }
   }
@@ -198,12 +199,9 @@ export class WebDAVFS implements WebDAVFileSystem {
       }
       
       // 创建Buffer
-      let buffer: Buffer;
-      if (typeof Buffer !== 'undefined') {
-        buffer = Buffer.from(response.data);
-      } else {
-        buffer = Buffer.from(new Uint8Array(response.data));
-      }
+      const arrayBuffer = response.data as ArrayBuffer;
+      const uint8Array = new Uint8Array(arrayBuffer);
+      const buffer = Buffer.from(uint8Array);
 
       // 根据编码返回字符串或Buffer
       if (options.encoding) {
@@ -440,7 +438,10 @@ export class WebDAVFS implements WebDAVFileSystem {
       // 删除文件或空目录
       await this._delete(path);
     } catch (err: unknown) {
-      if (force && (err.code === 'ENOENT' || err.status === 404)) {
+      if (force && (
+        (err instanceof Error && 'code' in err && err.code === 'ENOENT') || 
+        (err instanceof Error && 'status' in err && err.status === 404)
+      )) {
         // force=true 时忽略不存在
         return;
       }

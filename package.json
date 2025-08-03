@@ -1,6 +1,6 @@
 {
   "name": "zen-fs-webdav",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "一个简单、现代的 WebDAV 客户端库，提供类似文件系统的 API",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -28,16 +28,16 @@
     "browser",
     "node"
   ],
-  "author": "",
+  "author": "Richard",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/zen-fs-webdav.git"
+    "url": "https://github.com/weijia/zen-fs-webdav.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/zen-fs-webdav/issues"
+    "url": "https://github.com/weijia/zen-fs-webdav/issues"
   },
-  "homepage": "https://github.com/yourusername/zen-fs-webdav#readme",
+  "homepage": "https://github.com/weijia/zen-fs-webdav#readme",
   "devDependencies": {
     "@types/jest": "^29.5.0",
     "@types/node": "^18.15.11",
