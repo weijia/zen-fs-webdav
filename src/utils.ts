@@ -479,9 +479,20 @@ export function parseWebDAVXml(xml: string, basePath: string): Stats[] {
   function getCaseInsensitive(obj: unknown, ...keys: string[]): unknown {
     if (!obj) return undefined;
     for (const key of keys) {
+      // 直接匹配
       if ((obj as Record<string, unknown>)[key] !== undefined) return (obj as Record<string, unknown>)[key];
+      
+      // 不区分大小写匹配
       const found = Object.keys(obj).find(k => k.toLowerCase() === key.toLowerCase());
       if (found) return (obj as Record<string, unknown>)[found];
+      
+      // 匹配任意命名空间前缀的标签名（例如 resourcetype 匹配 lp1:resourcetype, d:resourcetype 等）
+      const keyWithoutPrefix = key.includes(':') ? key.split(':').pop()! : key;
+      const foundWithNamespace = Object.keys(obj).find(k => {
+        const kWithoutPrefix = k.includes(':') ? k.split(':').pop()! : k;
+        return kWithoutPrefix.toLowerCase() === keyWithoutPrefix.toLowerCase();
+      });
+      if (foundWithNamespace) return (obj as Record<string, unknown>)[foundWithNamespace];
     }
     return undefined;
   }
@@ -495,7 +506,15 @@ export function parseWebDAVXml(xml: string, basePath: string): Stats[] {
     const prop = getCaseInsensitive(propstat, 'd:prop', 'prop') || propstat;
     const resourcetype = getCaseInsensitive(prop, 'd:resourcetype', 'resourcetype');
     const collection = resourcetype && getCaseInsensitive(resourcetype, 'd:collection', 'collection');
-    const isDirectory = !!(resourcetype && collection !== undefined);
+    const getcontentlength = getCaseInsensitive(prop, 'd:getcontentlength', 'getcontentlength');
+    
+    // 判断是否为目录：
+    // 1. resourcetype 中有 collection 元素 -> 目录
+    // 2. 如果有 getcontentlength -> 文件（即使 href 以 / 结尾）
+    // 3. 否则根据 href 是否以斜杠结尾判断（WebDAV 规范中目录通常以 / 结尾）
+    // 注意：空的 resourcetype（如 <lp1:resourcetype/>）会被解析为空字符串或空对象
+    const hasCollection = !!(resourcetype && typeof resourcetype === 'object' && collection !== undefined);
+    const isDirectory = hasCollection || (!getcontentlength && href.endsWith('/'));
 
     // 如果basePath是文件，则直接取文件名，否则去除basePath前缀
     let name: string;

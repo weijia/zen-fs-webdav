@@ -152,7 +152,7 @@ export class WebDAVFS implements WebDAVFileSystem {
       if ((error as Error).name === 'AbortError') {
         throw new TimeoutError(`请求超时: ${url}`);
       } else {
-        throw new NetworkError(error, `网络错误: ${(error as Error).message}`);
+        throw new NetworkError(error as Error, `网络错误: ${(error as Error).message}`);
       }
     }
   }
@@ -181,11 +181,24 @@ export class WebDAVFS implements WebDAVFileSystem {
   /**
    * 读取文件内容
    * @param path 文件路径
-   * @param options 读取选项
+   * @param encodingOrOptions 编码字符串或读取选项对象
    * @returns 文件内容
    */
-  async readFile(path: string, options: ReadFileOptions = {}): Promise<Buffer | string> {
+  async readFile(
+    path: string, 
+    encodingOrOptions?: string | ReadFileOptions
+  ): Promise<Buffer | string> {
     const normalizedPath = normalizePath(path);
+    
+    // 处理参数：兼容 fs.promises.readFile(path, encoding) 和原有的 readFile(path, options)
+    let options: ReadFileOptions = {};
+    if (typeof encodingOrOptions === 'string') {
+      // Node.js fs.promises 风格：readFile(path, encoding)
+      options = { encoding: encodingOrOptions as BufferEncoding };
+    } else if (encodingOrOptions) {
+      // 原有风格：readFile(path, options)
+      options = encodingOrOptions;
+    }
     
     try {
       const response = await this.request('GET', normalizedPath, {
@@ -197,19 +210,23 @@ export class WebDAVFS implements WebDAVFileSystem {
         this.handleResponseError(response.status, normalizedPath);
       }
       
-      // 创建Buffer
-      let buffer: Buffer;
-      if (typeof Buffer !== 'undefined') {
-        buffer = Buffer.from(response.data);
-      } else {
-        buffer = Buffer.from(new Uint8Array(response.data));
-      }
+      // 处理响应数据（兼容浏览器和 Node.js）
+      const arrayBuffer = response.data instanceof ArrayBuffer 
+        ? response.data 
+        : response.data.buffer || response.data;
 
-      // 根据编码返回字符串或Buffer
+      // 根据编码返回字符串或 Buffer
       if (options.encoding) {
-        return buffer.toString(options.encoding as BufferEncoding);
+        // 使用 TextDecoder 解码（浏览器兼容）
+        const decoder = new TextDecoder(options.encoding as string);
+        return decoder.decode(arrayBuffer);
       } else {
-        return buffer;
+        // 返回 Buffer（Node.js）或 Uint8Array（浏览器）
+        if (typeof Buffer !== 'undefined') {
+          return Buffer.from(arrayBuffer);
+        } else {
+          return new Uint8Array(arrayBuffer) as any;
+        }
       }
     } catch (error: unknown) {
       if (error instanceof WebDAVError) {
@@ -365,41 +382,64 @@ export class WebDAVFS implements WebDAVFileSystem {
   async mkdir(path: string, options: MkdirOptions = {}): Promise<void> {
     const normalizedPath = normalizePath(path);
     
+    // 检查目录是否已存在
+    let pathExists = false;
+    let isDirectory = false;
+    
     try {
-      // 检查目录是否已存在
-      try {
-        const stat = await this.stat(normalizedPath);
-        if (stat.isDirectory) {
-          return; // 目录已存在，视为成功
+      const stat = await this.stat(normalizedPath);
+      pathExists = true;
+      isDirectory = stat.isDirectory;
+    } catch (error) {
+      // stat 失败,路径不存在或其他错误
+      pathExists = false;
+    }
+    
+    // 如果路径已存在
+    if (pathExists) {
+      if (isDirectory) {
+        // 是目录：递归模式下返回成功，非递归模式抛出错误
+        if (options.recursive) {
+          return; // 递归模式下目录存在是OK的
         }
-        throw new FileExistsError(normalizedPath); // 路径存在但不是目录
-      } catch (error) {
-        if (!(error instanceof NotFoundError)) {
-          throw error;
-        }
-        // 目录不存在，继续创建
+        throw new FileExistsError(normalizedPath);
+      } else {
+        // 路径存在但不是目录，总是抛出错误
+        throw new FileExistsError(normalizedPath);
       }
-      
+    }
+    
+    // 到这里说明目录不存在，需要创建
+    try {
       // 如果需要递归创建父目录
-      if (options.recursive !== false) {
+      if (options.recursive) {
         const parentDir = getDirFromPath(normalizedPath);
         if (parentDir !== '/' && parentDir !== normalizedPath) {
           try {
             await this.stat(parentDir);
+            // 父目录存在，继续
           } catch (error) {
-            if (error instanceof NotFoundError) {
-              // 递归创建父目录
-              await this.mkdir(parentDir, options);
-            } else {
-              throw error;
-            }
+            // 父目录不存在，递归创建
+            await this.mkdir(parentDir, options);
           }
         }
       }
       
+      // 创建目录
       const response = await this.request('MKCOL', normalizedPath);
       
       if (response.status >= 400) {
+        // 特殊处理: 405 可能表示目录已存在
+        if (response.status === 405 && options.recursive) {
+          try {
+            const stat = await this.stat(normalizedPath);
+            if (stat.isDirectory) {
+              return; // 目录确实存在，视为成功
+            }
+          } catch (e) {
+            // 检查失败，继续抛出原始错误
+          }
+        }
         this.handleResponseError(response.status, normalizedPath);
       }
       
@@ -440,7 +480,8 @@ export class WebDAVFS implements WebDAVFileSystem {
       // 删除文件或空目录
       await this._delete(path);
     } catch (err: unknown) {
-      if (force && (err.code === 'ENOENT' || err.status === 404)) {
+      const error = err as any;
+      if (force && (error.code === 'ENOENT' || error.status === 404)) {
         // force=true 时忽略不存在
         return;
       }
@@ -655,5 +696,29 @@ export class WebDAVFS implements WebDAVFileSystem {
    */
   async unlink(path: string): Promise<void> {
     await this.deleteFile(path);
+  }
+
+  // ============================================
+  // Node.js fs.promises 兼容接口
+  // 这些方法使 WebDAVFS 可以直接作为 IFileSystem 使用
+  // ============================================
+
+  /**
+   * 读取目录（fs.promises.readdir 兼容）
+   * @param path 目录路径
+   * @returns 文件名数组
+   */
+  async readdir(path: string): Promise<string[]> {
+    const stats = await this.readDir(path);
+    return stats.map(stat => stat.name);
+  }
+
+  /**
+   * 重命名/移动文件（fs.promises.rename 兼容）
+   * @param oldPath 原路径
+   * @param newPath 新路径
+   */
+  async rename(oldPath: string, newPath: string): Promise<void> {
+    await this.move(oldPath, newPath, true);
   }
 }
