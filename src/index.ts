@@ -24,3 +24,6 @@ export {
   CopyOptions,
   MoveOptions,
 } from './types';
+
+// 导出工具函数（例如 parseWebDAVXml）以便其它包可以直接使用
+export { parseWebDAVXml } from './utils';

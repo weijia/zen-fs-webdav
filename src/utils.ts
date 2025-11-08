@@ -395,7 +395,11 @@ export async function toArrayBuffer(data: string | ArrayBuffer | Blob): Promise<
     if (typeof TextEncoder !== 'undefined') {
       return new TextEncoder().encode(data).buffer;
     } else if (typeof Buffer !== 'undefined') {
-      return Buffer.from(data).buffer;
+        // Buffer.buffer may be a larger ArrayBuffer; create a new ArrayBuffer
+        // that exactly matches the Buffer contents to satisfy strict typing
+        const buf = Buffer.from(data);
+        // slice the underlying ArrayBuffer to the buffer's byte range
+        return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
     } else {
       throw new WebDAVError('无法将字符串转换为 ArrayBuffer');
     }
