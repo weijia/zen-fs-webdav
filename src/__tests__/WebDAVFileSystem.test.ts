@@ -121,16 +121,34 @@ describe('WebDAVFileSystem', () => {
 
   describe('readFile', () => {
     it('should read file as text', async () => {
+	  // 将 Buffer 转换为 ArrayBuffer
+	  const mockText = 'file content';
+	  // Node.js 环境下创建 ArrayBuffer
+	  const buffer = Buffer.from(mockText, 'utf-8');
+	  const mockArrayBuffer = buffer.buffer.slice(
+		buffer.byteOffset,
+		buffer.byteOffset + buffer.byteLength
+	  );
+      console.log('Mock buffer content:', mockArrayBuffer);
+      console.log('Mock buffer type:', typeof mockArrayBuffer);
+      console.log('Mock buffer instanceof Buffer:', mockArrayBuffer instanceof Buffer);
+      
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
         status: 200,
         text: jest.fn(), // 不需要 mockResolvedValue
-        arrayBuffer: jest.fn().mockResolvedValue(Buffer.from('file content')),
+        arrayBuffer: jest.fn().mockResolvedValue(mockArrayBuffer),
         headers: { forEach: jest.fn() },
         body: new ReadableStream(),
       });
       
+      console.log('Calling fs.readFile...');
       const content = await fs.readFile('/file.txt', { encoding: 'utf-8' });
+      
+      console.log('Actual content:', content);
+      console.log('Expected content:', 'file content');
+      console.log('Content type:', typeof content);
+      console.log('Content length:', content.length);
       
       expect(content).toBe('file content');
       expect(global.fetch).toHaveBeenCalledWith(

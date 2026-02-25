@@ -399,7 +399,7 @@ export async function toArrayBuffer(data: string | ArrayBuffer | Blob): Promise<
         // that exactly matches the Buffer contents to satisfy strict typing
         const buf = Buffer.from(data);
         // slice the underlying ArrayBuffer to the buffer's byte range
-        return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+        return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
     } else {
       throw new WebDAVError('无法将字符串转换为 ArrayBuffer');
     }
@@ -467,10 +467,13 @@ export function getDirFromPath(path: string): string {
  * @returns Stats[]
  */
 
+// 导入he库用于HTML实体解码
+import * as he from 'he';
+
 export function parseWebDAVXml(xml: string, basePath: string): Stats[] {
   // 简单实现，实际可用 xml2js、fast-xml-parser 等库解析
   // 这里只做最基础的兼容，建议根据实际WebDAV响应完善
-  const decode = require('he').decode;
+  const decode = he.decode;
   const result: Stats[] = [];
   if (!xml) return result;
   const parser = new XMLParser({
@@ -505,7 +508,8 @@ export function parseWebDAVXml(xml: string, basePath: string): Stats[] {
   const arr = Array.isArray(responses) ? responses : [responses];
   const isBasePathFile = basePath && !basePath.endsWith('/');
   for (const item of arr) {
-    const href = decode(getCaseInsensitive(item, 'd:href', 'href') || '');
+    const hrefRaw = getCaseInsensitive(item, 'd:href', 'href');
+    const href = decode(typeof hrefRaw === 'string' ? hrefRaw : hrefRaw ? String(hrefRaw) : '');
     const propstat = getCaseInsensitive(item, 'd:propstat', 'propstat', 'd:prop', 'prop') || {};
     const prop = getCaseInsensitive(propstat, 'd:prop', 'prop') || propstat;
     const resourcetype = getCaseInsensitive(prop, 'd:resourcetype', 'resourcetype');

@@ -35,6 +35,35 @@ import {
   getContentType,
 } from './utils';
 
+// 兼容 TextDecoder（浏览器和 Node.js）
+class TextDecoderFallback {
+  constructor(private encoding: string) {}
+  decode(buffer: ArrayBuffer) {
+    const uint8Array = new Uint8Array(buffer);
+    return Array.from(uint8Array).map(byte => String.fromCharCode(byte)).join('');
+  }
+}
+
+let TextDecoderImpl: any;
+
+// 尝试获取 TextDecoder
+if (typeof TextDecoder !== 'undefined') {
+  TextDecoderImpl = TextDecoder;
+} else {
+  try {
+    // 在 Node.js 中，尝试从全局对象获取
+    if (typeof global !== 'undefined' && (global as any).TextDecoder) {
+      TextDecoderImpl = (global as any).TextDecoder;
+    } else {
+      // 如果都失败了，使用后备实现
+      TextDecoderImpl = TextDecoderFallback;
+    }
+  } catch {
+    // 作为最终后备，使用简单的 ASCII 解码
+    TextDecoderImpl = TextDecoderFallback;
+  }
+}
+
 /**
  * WebDAV文件系统实现类
  */
@@ -113,7 +142,7 @@ export class WebDAVFS implements WebDAVFileSystem {
       const response = await fetch(url, {
         method,
         headers,
-        body: options.body,
+        body: options.body as BodyInit | null | undefined,
         signal: controller?.signal,
         credentials: 'include',
       });
@@ -218,7 +247,7 @@ export class WebDAVFS implements WebDAVFileSystem {
       // 根据编码返回字符串或 Buffer
       if (options.encoding) {
         // 使用 TextDecoder 解码（浏览器兼容）
-        const decoder = new TextDecoder(options.encoding as string);
+        const decoder = new TextDecoderImpl(options.encoding as string);
         return decoder.decode(arrayBuffer);
       } else {
         // 返回 Buffer（Node.js）或 Uint8Array（浏览器）
