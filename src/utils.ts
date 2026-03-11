@@ -524,16 +524,29 @@ export function parseWebDAVXml(xml: string, basePath: string): Stats[] {
     const hasCollection = !!(resourcetype && typeof resourcetype === 'object' && collection !== undefined);
     const isDirectory = hasCollection || (!getcontentlength && href.endsWith('/'));
 
-    // 如果basePath是文件，则直接取文件名，否则去除basePath前缀
+    // 规范化 href 与 basePath，然后尝试将 href 中的任意前缀（例如 /dav）对齐到 basePath
+    const hrefNorm = normalizePath(href);
+    const baseNorm = normalizePath(basePath || '/');
+
+    // 如果 href 包含 basePath，则截取从 basePath 开始的子串，保证返回的 path 与 basePath 对齐
+    let fullPath = hrefNorm;
+    const idx = hrefNorm.indexOf(baseNorm);
+    if (idx !== -1) {
+      fullPath = hrefNorm.slice(idx) || baseNorm;
+    }
+
+    // 计算 name（相对于 basePath）
     let name: string;
     if (isBasePathFile) {
-      name = href.split('/').filter(Boolean).pop() || '';
+      name = hrefNorm.split('/').filter(Boolean).pop() || '';
     } else {
-      name = href.replace(basePath, '').replace(/^\//, '').replace(/\/$/, '');
+      name = fullPath.replace(baseNorm, '').replace(/^\//, '').replace(/\/$/, '');
     }
+
     if (!name) continue;
+
     result.push({
-      path: href,
+      path: fullPath,
       name,
       isDirectory,
       isFile: !isDirectory,
