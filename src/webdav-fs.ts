@@ -72,6 +72,7 @@ export class WebDAVFS implements WebDAVFileSystem {
   private auth?: { username: string; password: string };
   private timeout: number;
   private headers: Record<string, string>;
+  private httpClient?: any;
 
   /**
    * 创建WebDAV文件系统实例
@@ -92,6 +93,7 @@ export class WebDAVFS implements WebDAVFileSystem {
     }
     this.timeout = options.timeout || 30000;
     this.headers = options.headers || {};
+    this.httpClient = (options as any).httpClient;
   }
 
   /**
@@ -132,11 +134,25 @@ export class WebDAVFS implements WebDAVFileSystem {
     const normalizedPath = normalizePath(path);
     const url = joinUrl(this.baseUrl, normalizedPath);
     const headers = this.createHeaders(options.headers);
-    
+    // If a custom httpClient is provided (e.g. GM_xmlhttpRequest adapter), delegate to it
+    if (this.httpClient && typeof this.httpClient.request === 'function') {
+      try {
+        const resp = await this.httpClient.request(method, url, {
+          headers,
+          body: options.body,
+          responseType: options.responseType,
+          timeout: this.timeout,
+        });
+        return resp;
+      } catch (err: unknown) {
+        throw new NetworkError(err as Error, `网络错误: ${(err as Error).message}`);
+      }
+    }
+
     // 创建AbortController用于超时处理
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : undefined;
     const timeoutId = controller ? setTimeout(() => controller.abort(), this.timeout) : undefined;
-    
+
     try {
       // 使用fetch API（浏览器和现代Node.js都支持）
       const response = await fetch(url, {
@@ -146,16 +162,16 @@ export class WebDAVFS implements WebDAVFileSystem {
         signal: controller?.signal,
         credentials: 'include',
       });
-      
+
       // 清除超时
       if (timeoutId) clearTimeout(timeoutId);
-      
+
       // 提取响应头
       const responseHeaders: Record<string, string> = {};
       response.headers.forEach((value, key) => {
         responseHeaders[key.toLowerCase()] = value;
       });
-      
+
       // 根据请求的responseType处理响应数据
       let data;
       if (options.responseType === 'arraybuffer') {
@@ -167,7 +183,7 @@ export class WebDAVFS implements WebDAVFileSystem {
       } else {
         data = await response.text();
       }
-      
+
       return {
         data,
         status: response.status,
@@ -176,7 +192,7 @@ export class WebDAVFS implements WebDAVFileSystem {
     } catch (error: unknown) {
       // 清除超时
       if (timeoutId) clearTimeout(timeoutId);
-      
+
       // 处理错误
       if ((error as Error).name === 'AbortError') {
         throw new TimeoutError(`请求超时: ${url}`);
@@ -381,6 +397,7 @@ export class WebDAVFS implements WebDAVFileSystem {
       // 过滤结果
       const result = files.filter(file => {
         // 排除当前目录
+        // console.log(file, normalizedPath);
         if (file.path === normalizedPath) {
           return false;
         }

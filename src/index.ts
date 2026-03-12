@@ -27,3 +27,5 @@ export {
 
 // 导出工具函数（例如 parseWebDAVXml）以便其它包可以直接使用
 export { parseWebDAVXml } from './utils';
+// 导出 GM 适配器，方便 userscript 使用
+export { gmHttpClient, gmRequestAdapter } from './gm-adapter';

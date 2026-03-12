@@ -31,6 +31,17 @@ export interface WebDAVOptions {
    * 请求超时时间，单位毫秒（可选，默认 30000）
    */
   timeout?: number;
+  /**
+   * 可选的自定义 HTTP 客户端适配器，用于注入像 Greasemonkey 的 GM_xmlhttpRequest
+   * 方法签名应为 request(method, url, options) => Promise<{data,status,headers}>
+   */
+  httpClient?: {
+    request: (
+      method: string,
+      url: string,
+      options?: { headers?: Record<string, string>; body?: any; responseType?: 'text' | 'arraybuffer' | 'blob' | 'json'; timeout?: number }
+    ) => Promise<{ data: any; status: number; headers: Record<string, string> }>;
+  };
 }
 
 /**
