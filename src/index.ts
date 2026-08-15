@@ -29,3 +29,13 @@ export {
 export { parseWebDAVXml } from './utils';
 // 导出 GM 适配器，方便 userscript 使用
 export { gmHttpClient, gmRequestAdapter } from './gm-adapter';
+
+// 导出调试控制接口（基于 @richard432/localstorage-logger，缺省关闭）
+export {
+  setDebugEnabled,
+  isDebugEnabled,
+  enableDebug,
+  disableDebug,
+  listDebugModulesNames as listDebugModules,
+  MODULE as DEBUG_MODULE,
+} from './debug';

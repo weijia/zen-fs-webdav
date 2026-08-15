@@ -31,6 +31,13 @@ export interface WebDAVOptions {
    * 请求超时时间，单位毫秒（可选，默认 30000）
    */
   timeout?: number;
+
+  /**
+   * 是否开启调试日志（可选，默认 false）。
+   * 开启后会通过 @richard432/localstorage-logger 打印 WebDAV 请求/响应细节。
+   * 也可在运行时通过 setDebugEnabled(true) / enableDebug() 动态开启。
+   */
+  debug?: boolean;
   /**
    * 可选的自定义 HTTP 客户端适配器，用于注入像 Greasemonkey 的 GM_xmlhttpRequest
    * 方法签名应为 request(method, url, options) => Promise<{data,status,headers}>

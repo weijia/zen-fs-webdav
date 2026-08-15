@@ -35,6 +35,13 @@ import {
   getContentType,
 } from './utils';
 
+import {
+  log as debugLog,
+  error as debugError,
+  enableDebug,
+  isDebugEnabled as debugEnabled,
+} from './debug';
+
 // 兼容 TextDecoder（浏览器和 Node.js）
 class TextDecoderFallback {
   constructor(private encoding: string) {}
@@ -94,6 +101,12 @@ export class WebDAVFS implements WebDAVFileSystem {
     this.timeout = options.timeout || 30000;
     this.headers = options.headers || {};
     this.httpClient = (options as any).httpClient;
+
+    // 调试开关：实例化时若传 options.debug=true 立即开启
+    if (options.debug) {
+      enableDebug();
+    }
+    debugLog(`[WebDAVFS] 实例化 baseUrl=${this.baseUrl} debug=${debugEnabled()}`);
   }
 
   /**
@@ -134,6 +147,13 @@ export class WebDAVFS implements WebDAVFileSystem {
     const normalizedPath = normalizePath(path);
     const url = joinUrl(this.baseUrl, normalizedPath);
     const headers = this.createHeaders(options.headers);
+
+    if (debugEnabled()) {
+      const safeHeaders = { ...headers };
+      if (safeHeaders['Authorization']) safeHeaders['Authorization'] = '***';
+      debugLog(`[WebDAVFS] --> ${method} ${url}`, safeHeaders, options.body !== undefined ? `[body ${typeof options.body}]` : '');
+    }
+
     // If a custom httpClient is provided (e.g. GM_xmlhttpRequest adapter), delegate to it
     if (this.httpClient && typeof this.httpClient.request === 'function') {
       try {
@@ -184,6 +204,16 @@ export class WebDAVFS implements WebDAVFileSystem {
         data = await response.text();
       }
 
+      if (debugEnabled()) {
+        const preview =
+          typeof data === 'string'
+            ? data.length > 2000
+              ? `${data.slice(0, 2000)}…(len=${data.length})`
+              : data
+            : `[${typeof data}]`;
+        debugLog(`[WebDAVFS] <-- ${method} ${url} status=${response.status}`, preview);
+      }
+
       return {
         data,
         status: response.status,
@@ -195,8 +225,10 @@ export class WebDAVFS implements WebDAVFileSystem {
 
       // 处理错误
       if ((error as Error).name === 'AbortError') {
+        debugError(`[WebDAVFS] !! ${method} ${url} 请求超时`);
         throw new TimeoutError(`请求超时: ${url}`);
       } else {
+        debugError(`[WebDAVFS] !! ${method} ${url} 网络错误: ${(error as Error).message}`);
         throw new NetworkError(error as Error, `网络错误: ${(error as Error).message}`);
       }
     }
@@ -234,7 +266,8 @@ export class WebDAVFS implements WebDAVFileSystem {
     encodingOrOptions?: string | ReadFileOptions
   ): Promise<Buffer | string> {
     const normalizedPath = normalizePath(path);
-    
+    debugLog(`[WebDAVFS] readFile(${normalizedPath})`);
+
     // 处理参数：兼容 fs.promises.readFile(path, encoding) 和原有的 readFile(path, options)
     let options: ReadFileOptions = {};
     if (typeof encodingOrOptions === 'string') {
@@ -294,6 +327,7 @@ export class WebDAVFS implements WebDAVFileSystem {
     options: WriteFileOptions = {}
   ): Promise<WebDAVResult> {
     const normalizedPath = normalizePath(path);
+    debugLog(`[WebDAVFS] writeFile(${normalizedPath}, overwrite=${options.overwrite !== false})`);
     const getFilenameFromPath = (p: string) => {
       const parts = p.split('/');
       return parts[parts.length - 1] || '';
@@ -375,7 +409,8 @@ export class WebDAVFS implements WebDAVFileSystem {
    */
   async readDir(path: string, options: ReaddirOptions = {}): Promise<Stats[]> {
     const normalizedPath = normalizePath(path);
-    
+    debugLog(`[WebDAVFS] readDir(${normalizedPath}, recursive=${!!options.recursive})`);
+
     try {
       // 准备PROPFIND请求
       const headers = {
@@ -427,7 +462,8 @@ export class WebDAVFS implements WebDAVFileSystem {
    */
   async mkdir(path: string, options: MkdirOptions = {}): Promise<void> {
     const normalizedPath = normalizePath(path);
-    
+    debugLog(`[WebDAVFS] mkdir(${normalizedPath}, recursive=${!!options.recursive})`);
+
     // 检查目录是否已存在
     let pathExists = false;
     let isDirectory = false;
@@ -585,7 +621,8 @@ export class WebDAVFS implements WebDAVFileSystem {
    */
   async stat(path: string): Promise<Stats> {
     const normalizedPath = normalizePath(path);
-    
+    debugLog(`[WebDAVFS] stat(${normalizedPath})`);
+
     try {
       // 准备PROPFIND请求
       const headers = {
@@ -627,6 +664,7 @@ export class WebDAVFS implements WebDAVFileSystem {
    * @returns 是否存在
    */
   async exists(path: string): Promise<boolean> {
+    debugLog(`[WebDAVFS] exists(${normalizePath(path)})`);
     try {
       await this.stat(path);
       return true;
@@ -648,7 +686,8 @@ export class WebDAVFS implements WebDAVFileSystem {
   async copy(source: string, destination: string, overwrite = true): Promise<WebDAVResult> {
     const normalizedSource = normalizePath(source);
     const normalizedDestination = normalizePath(destination);
-    
+    debugLog(`[WebDAVFS] copy(${normalizedSource} -> ${normalizedDestination}, overwrite=${overwrite})`);
+
     try {
       // 检查源文件是否存在
       await this.stat(normalizedSource);
@@ -697,7 +736,8 @@ export class WebDAVFS implements WebDAVFileSystem {
   async move(source: string, destination: string, overwrite = true): Promise<WebDAVResult> {
     const normalizedSource = normalizePath(source);
     const normalizedDestination = normalizePath(destination);
-    
+    debugLog(`[WebDAVFS] move(${normalizedSource} -> ${normalizedDestination}, overwrite=${overwrite})`);
+
     try {
       // 检查源文件是否存在
       await this.stat(normalizedSource);
@@ -741,6 +781,7 @@ export class WebDAVFS implements WebDAVFileSystem {
    * @param path 文件路径
    */
   async unlink(path: string): Promise<void> {
+    debugLog(`[WebDAVFS] unlink(${normalizePath(path)})`);
     await this.deleteFile(path);
   }
 
@@ -755,6 +796,7 @@ export class WebDAVFS implements WebDAVFileSystem {
    * @returns 文件名数组
    */
   async readdir(path: string): Promise<string[]> {
+    debugLog(`[WebDAVFS] readdir(${normalizePath(path)})`);
     const stats = await this.readDir(path);
     return stats.map(stat => stat.name);
   }
@@ -765,6 +807,7 @@ export class WebDAVFS implements WebDAVFileSystem {
    * @param newPath 新路径
    */
   async rename(oldPath: string, newPath: string): Promise<void> {
+    debugLog(`[WebDAVFS] rename(${normalizePath(oldPath)} -> ${normalizePath(newPath)})`);
     await this.move(oldPath, newPath, true);
   }
 }

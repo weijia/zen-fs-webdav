@@ -58,6 +58,7 @@
     "node": ">=14.0.0"
   },
   "dependencies": {
+    "@richard432/localstorage-logger": "^0.1.0",
     "fast-xml-parser": "^5.2.5",
     "he": "^1.2.0"
   }
