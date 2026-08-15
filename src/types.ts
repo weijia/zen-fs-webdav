@@ -6,27 +6,27 @@ export interface WebDAVOptions {
    * WebDAV 服务器的基础 URL
    */
   baseUrl: string;
-  
+
   /**
    * 认证用户名（可选）
    */
   username?: string;
-  
+
   /**
    * 认证密码（可选）
    */
   password?: string;
-  
+
   /**
    * 认证令牌（可选，如果提供则优先使用）
    */
   token?: string;
-  
+
   /**
    * 自定义请求头（可选）
    */
   headers?: Record<string, string>;
-  
+
   /**
    * 请求超时时间，单位毫秒（可选，默认 30000）
    */
@@ -46,7 +46,12 @@ export interface WebDAVOptions {
     request: (
       method: string,
       url: string,
-      options?: { headers?: Record<string, string>; body?: any; responseType?: 'text' | 'arraybuffer' | 'blob' | 'json'; timeout?: number }
+      options?: {
+        headers?: Record<string, string>;
+        body?: any;
+        responseType?: 'text' | 'arraybuffer' | 'blob' | 'json';
+        timeout?: number;
+      },
     ) => Promise<{ data: any; status: number; headers: Record<string, string> }>;
   };
 }
@@ -59,17 +64,17 @@ export interface WebDAVRequestOptions {
    * 请求方法
    */
   method: string;
-  
+
   /**
    * 请求头
    */
   headers?: Record<string, string>;
-  
+
   /**
    * 请求体
    */
   body?: string | ArrayBuffer | null;
-  
+
   /**
    * 请求超时时间，单位毫秒
    */
@@ -84,27 +89,27 @@ export interface FileEntry {
    * 文件或目录名称
    */
   name: string;
-  
+
   /**
    * 是否为目录
    */
   isDirectory: boolean;
-  
+
   /**
    * 文件大小（字节）
    */
   size?: number;
-  
+
   /**
    * 最后修改时间
    */
   lastModified?: Date;
-  
+
   /**
    * 创建时间
    */
   createdAt?: Date;
-  
+
   /**
    * 文件或目录的完整路径
    */
@@ -119,42 +124,42 @@ export interface Stats {
    * 是否为目录
    */
   isDirectory: boolean;
-  
+
   /**
    * 是否为文件
    */
   isFile: boolean;
-  
+
   /**
    * 文件大小（字节）
    */
   size: number;
-  
+
   /**
    * 最后修改时间
    */
   lastModified?: Date;
-  
+
   /**
    * 创建时间
    */
   createdAt?: Date;
-  
+
   /**
    * 文件或目录名称
    */
   name: string;
-  
+
   /**
    * 文件或目录的完整路径
    */
   path: string;
-  
+
   /**
    * 文件的 MIME 类型
    */
   mimeType?: string;
-  
+
   /**
    * 文件的 ETag
    */
@@ -169,7 +174,7 @@ export interface ReadFileOptions {
    * 响应类型
    */
   responseType?: 'text' | 'arraybuffer';
-  
+
   /**
    * 编码（仅当 responseType 为 'text' 时有效）
    */
@@ -185,7 +190,7 @@ export interface WriteFileOptions {
    * 是否覆盖现有文件
    */
   overwrite?: boolean;
-  
+
   /**
    * 文件的 MIME 类型
    */
@@ -220,7 +225,7 @@ export interface ReaddirOptions {
    * 是否包含详细信息
    */
   withFileTypes?: boolean;
-  
+
   /**
    * 深度，1 表示只列出当前目录，大于 1 表示递归列出子目录
    */
@@ -238,7 +243,7 @@ export interface CopyOptions {
    * 是否覆盖目标位置的现有文件
    */
   overwrite?: boolean;
-  
+
   /**
    * 是否递归复制目录
    */
@@ -263,17 +268,17 @@ export interface WebDAVResult {
    * 操作是否成功
    */
   success: boolean;
-  
+
   /**
    * HTTP状态码
    */
   statusCode: number;
-  
+
   /**
    * 操作结果消息（可选）
    */
   message?: string;
-  
+
   /**
    * 操作返回的数据（可选）
    */

@@ -47,7 +47,9 @@ class TextDecoderFallback {
   constructor(private encoding: string) {}
   decode(buffer: ArrayBuffer) {
     const uint8Array = new Uint8Array(buffer);
-    return Array.from(uint8Array).map(byte => String.fromCharCode(byte)).join('');
+    return Array.from(uint8Array)
+      .map(byte => String.fromCharCode(byte))
+      .join('');
   }
 }
 
@@ -90,9 +92,7 @@ export class WebDAVFS implements WebDAVFileSystem {
       throw new ArgumentError('必须提供baseUrl');
     }
 
-    this.baseUrl = options.baseUrl.endsWith('/') 
-      ? options.baseUrl.slice(0, -1) 
-      : options.baseUrl;
+    this.baseUrl = options.baseUrl.endsWith('/') ? options.baseUrl.slice(0, -1) : options.baseUrl;
     if (options.username && options.password) {
       this.auth = { username: options.username, password: options.password };
     } else {
@@ -142,7 +142,7 @@ export class WebDAVFS implements WebDAVFileSystem {
       headers?: Record<string, string>;
       body?: string | ArrayBuffer | Blob | Buffer;
       responseType?: 'text' | 'arraybuffer' | 'blob' | 'json';
-    } = {}
+    } = {},
   ): Promise<{ data: any; status: number; headers: Record<string, string> }> {
     const normalizedPath = normalizePath(path);
     const url = joinUrl(this.baseUrl, normalizedPath);
@@ -151,7 +151,11 @@ export class WebDAVFS implements WebDAVFileSystem {
     if (debugEnabled()) {
       const safeHeaders = { ...headers };
       if (safeHeaders['Authorization']) safeHeaders['Authorization'] = '***';
-      debugLog(`[WebDAVFS] --> ${method} ${url}`, safeHeaders, options.body !== undefined ? `[body ${typeof options.body}]` : '');
+      debugLog(
+        `[WebDAVFS] --> ${method} ${url}`,
+        safeHeaders,
+        options.body !== undefined ? `[body ${typeof options.body}]` : '',
+      );
     }
 
     // If a custom httpClient is provided (e.g. GM_xmlhttpRequest adapter), delegate to it
@@ -240,7 +244,7 @@ export class WebDAVFS implements WebDAVFileSystem {
    * @param path 请求路径
    * @param error 原始错误
    */
-  private handleResponseError(status: number, path: string, error?: Error): never {
+  private handleResponseError(status: number, path: string, _error?: Error): never {
     switch (status) {
       case 401:
         throw new AuthenticationError(`认证失败: ${path}`);
@@ -262,8 +266,8 @@ export class WebDAVFS implements WebDAVFileSystem {
    * @returns 文件内容
    */
   async readFile(
-    path: string, 
-    encodingOrOptions?: string | ReadFileOptions
+    path: string,
+    encodingOrOptions?: string | ReadFileOptions,
   ): Promise<Buffer | string> {
     const normalizedPath = normalizePath(path);
     debugLog(`[WebDAVFS] readFile(${normalizedPath})`);
@@ -277,21 +281,22 @@ export class WebDAVFS implements WebDAVFileSystem {
       // 原有风格：readFile(path, options)
       options = encodingOrOptions;
     }
-    
+
     try {
       const response = await this.request('GET', normalizedPath, {
         headers: options.headers,
         responseType: 'arraybuffer',
       });
-      
+
       if (response.status >= 400) {
         this.handleResponseError(response.status, normalizedPath);
       }
-      
+
       // 处理响应数据（兼容浏览器和 Node.js）
-      const arrayBuffer = response.data instanceof ArrayBuffer 
-        ? response.data 
-        : response.data.buffer || response.data;
+      const arrayBuffer =
+        response.data instanceof ArrayBuffer
+          ? response.data
+          : response.data.buffer || response.data;
 
       // 根据编码返回字符串或 Buffer
       if (options.encoding) {
@@ -324,7 +329,7 @@ export class WebDAVFS implements WebDAVFileSystem {
   async writeFile(
     path: string,
     data: Buffer | string,
-    options: WriteFileOptions = {}
+    options: WriteFileOptions = {},
   ): Promise<WebDAVResult> {
     const normalizedPath = normalizePath(path);
     debugLog(`[WebDAVFS] writeFile(${normalizedPath}, overwrite=${options.overwrite !== false})`);
@@ -340,22 +345,22 @@ export class WebDAVFS implements WebDAVFileSystem {
         throw new FileExistsError(normalizedPath);
       }
     }
-    
+
     // 准备请求头
     const headers = {
       'Content-Type': contentType,
     };
-    
+
     try {
       const response = await this.request('PUT', normalizedPath, {
         headers,
         body: data,
       });
-      
+
       if (response.status >= 400) {
         this.handleResponseError(response.status, normalizedPath);
       }
-      
+
       return {
         success: response.status >= 200 && response.status < 300,
         statusCode: response.status,
@@ -375,20 +380,20 @@ export class WebDAVFS implements WebDAVFileSystem {
    */
   async deleteFile(path: string): Promise<WebDAVResult> {
     const normalizedPath = normalizePath(path);
-    
+
     try {
       // 确保是文件而不是目录
       const stat = await this.stat(normalizedPath);
       if (stat.isDirectory) {
         throw new ArgumentError(`路径指向一个目录，请使用rmdir方法: ${normalizedPath}`);
       }
-      
+
       const response = await this.request('DELETE', normalizedPath);
-      
+
       if (response.status >= 400) {
         this.handleResponseError(response.status, normalizedPath);
       }
-      
+
       return {
         success: response.status >= 200 && response.status < 300,
         statusCode: response.status,
@@ -414,21 +419,21 @@ export class WebDAVFS implements WebDAVFileSystem {
     try {
       // 准备PROPFIND请求
       const headers = {
-        'Depth': options.recursive ? 'infinity' : '1',
+        Depth: options.recursive ? 'infinity' : '1',
         'Content-Type': 'application/xml',
       };
-      
+
       const response = await this.request('PROPFIND', normalizedPath, {
         headers,
       });
-      
+
       if (response.status >= 400) {
         this.handleResponseError(response.status, normalizedPath);
       }
-      
+
       // 解析XML响应
       const files = parseWebDAVXml(response.data, normalizedPath);
-      
+
       // 过滤结果
       const result = files.filter(file => {
         // 排除当前目录
@@ -436,15 +441,15 @@ export class WebDAVFS implements WebDAVFileSystem {
         if (file.path === normalizedPath) {
           return false;
         }
-        
+
         // 处理隐藏文件
         if (!options.includeHidden && file.name.startsWith('.')) {
           return false;
         }
-        
+
         return true;
       });
-      
+
       return result;
     } catch (error: unknown) {
       if (error instanceof WebDAVError) {
@@ -467,7 +472,7 @@ export class WebDAVFS implements WebDAVFileSystem {
     // 检查目录是否已存在
     let pathExists = false;
     let isDirectory = false;
-    
+
     try {
       const stat = await this.stat(normalizedPath);
       pathExists = true;
@@ -476,7 +481,7 @@ export class WebDAVFS implements WebDAVFileSystem {
       // stat 失败,路径不存在或其他错误
       pathExists = false;
     }
-    
+
     // 如果路径已存在
     if (pathExists) {
       if (isDirectory) {
@@ -490,7 +495,7 @@ export class WebDAVFS implements WebDAVFileSystem {
         throw new FileExistsError(normalizedPath);
       }
     }
-    
+
     // 到这里说明目录不存在，需要创建
     try {
       // 如果需要递归创建父目录
@@ -506,10 +511,10 @@ export class WebDAVFS implements WebDAVFileSystem {
           }
         }
       }
-      
+
       // 创建目录
       const response = await this.request('MKCOL', normalizedPath);
-      
+
       if (response.status >= 400) {
         // 特殊处理: 405 可能表示目录已存在
         if (response.status === 405 && options.recursive) {
@@ -524,7 +529,7 @@ export class WebDAVFS implements WebDAVFileSystem {
         }
         this.handleResponseError(response.status, normalizedPath);
       }
-      
+
       return;
     } catch (error: unknown) {
       if (error instanceof WebDAVError) {
@@ -539,7 +544,7 @@ export class WebDAVFS implements WebDAVFileSystem {
    * @param path 路径
    * @param options { recursive?: boolean, force?: boolean }
    */
-  async rm(path: string, options?: { recursive?: boolean, force?: boolean }) {
+  async rm(path: string, options?: { recursive?: boolean; force?: boolean }) {
     const { recursive = false, force = false } = options || {};
     try {
       const stat = await this.stat(path);
@@ -575,9 +580,9 @@ export class WebDAVFS implements WebDAVFileSystem {
    * 兼容旧的 rmdir 方法，内部重定向到 rm
    * @deprecated 请使用 rm
    */
-  async rmdir(path: string, options?: boolean | { recursive?: boolean, force?: boolean }) {
+  async rmdir(path: string, options?: boolean | { recursive?: boolean; force?: boolean }) {
     // 兼容 boolean 递归参数
-    let opts: { recursive?: boolean, force?: boolean } = {};
+    let opts: { recursive?: boolean; force?: boolean } = {};
     if (typeof options === 'boolean') {
       opts.recursive = options;
     } else if (typeof options === 'object' && options !== null) {
@@ -594,14 +599,14 @@ export class WebDAVFS implements WebDAVFileSystem {
   private async _delete(path: string) {
     // 实现 WebDAV DELETE 请求
     const normalizedPath = normalizePath(path);
-    
+
     try {
       const response = await this.request('DELETE', normalizedPath);
-      
+
       if (response.status >= 400) {
         this.handleResponseError(response.status, normalizedPath);
       }
-      
+
       return {
         success: response.status >= 200 && response.status < 300,
         statusCode: response.status,
@@ -626,29 +631,29 @@ export class WebDAVFS implements WebDAVFileSystem {
     try {
       // 准备PROPFIND请求
       const headers = {
-        'Depth': '0',
+        Depth: '0',
         'Content-Type': 'application/xml',
       };
-      
+
       const response = await this.request('PROPFIND', normalizedPath, {
         headers,
       });
-      
+
       if (response.status === 404) {
         throw new NotFoundError(normalizedPath);
       } else if (response.status >= 400) {
         this.handleResponseError(response.status, normalizedPath);
       }
-      
+
       // 解析XML响应
       const files = parseWebDAVXml(response.data, normalizedPath);
-      
+
       if (files.length === 0) {
         throw new NotFoundError(normalizedPath);
       }
-      
+
       const stat = files[0];
-      
+
       return stat;
     } catch (error: unknown) {
       if (error instanceof WebDAVError) {
@@ -686,12 +691,14 @@ export class WebDAVFS implements WebDAVFileSystem {
   async copy(source: string, destination: string, overwrite = true): Promise<WebDAVResult> {
     const normalizedSource = normalizePath(source);
     const normalizedDestination = normalizePath(destination);
-    debugLog(`[WebDAVFS] copy(${normalizedSource} -> ${normalizedDestination}, overwrite=${overwrite})`);
+    debugLog(
+      `[WebDAVFS] copy(${normalizedSource} -> ${normalizedDestination}, overwrite=${overwrite})`,
+    );
 
     try {
       // 检查源文件是否存在
       await this.stat(normalizedSource);
-      
+
       // 检查目标文件是否存在（如果不允许覆盖）
       if (!overwrite) {
         const exists = await this.exists(normalizedDestination);
@@ -699,21 +706,21 @@ export class WebDAVFS implements WebDAVFileSystem {
           throw new FileExistsError(normalizedDestination);
         }
       }
-      
+
       // 准备COPY请求
       const headers = {
-        'Destination': joinUrl(this.baseUrl, normalizedDestination),
-        'Overwrite': overwrite ? 'T' : 'F',
+        Destination: joinUrl(this.baseUrl, normalizedDestination),
+        Overwrite: overwrite ? 'T' : 'F',
       };
-      
+
       const response = await this.request('COPY', normalizedSource, {
         headers,
       });
-      
+
       if (response.status >= 400) {
         this.handleResponseError(response.status, normalizedSource);
       }
-      
+
       return {
         success: response.status >= 200 && response.status < 300,
         statusCode: response.status,
@@ -722,7 +729,11 @@ export class WebDAVFS implements WebDAVFileSystem {
       if (error instanceof WebDAVError) {
         throw error;
       }
-      throw new WebDAVError(`复制失败: ${normalizedSource} -> ${normalizedDestination}`, undefined, error);
+      throw new WebDAVError(
+        `复制失败: ${normalizedSource} -> ${normalizedDestination}`,
+        undefined,
+        error,
+      );
     }
   }
 
@@ -736,12 +747,14 @@ export class WebDAVFS implements WebDAVFileSystem {
   async move(source: string, destination: string, overwrite = true): Promise<WebDAVResult> {
     const normalizedSource = normalizePath(source);
     const normalizedDestination = normalizePath(destination);
-    debugLog(`[WebDAVFS] move(${normalizedSource} -> ${normalizedDestination}, overwrite=${overwrite})`);
+    debugLog(
+      `[WebDAVFS] move(${normalizedSource} -> ${normalizedDestination}, overwrite=${overwrite})`,
+    );
 
     try {
       // 检查源文件是否存在
       await this.stat(normalizedSource);
-      
+
       // 检查目标文件是否存在（如果不允许覆盖）
       if (!overwrite) {
         const exists = await this.exists(normalizedDestination);
@@ -749,21 +762,21 @@ export class WebDAVFS implements WebDAVFileSystem {
           throw new FileExistsError(normalizedDestination);
         }
       }
-      
+
       // 准备MOVE请求
       const headers = {
-        'Destination': joinUrl(this.baseUrl, normalizedDestination),
-        'Overwrite': overwrite ? 'T' : 'F',
+        Destination: joinUrl(this.baseUrl, normalizedDestination),
+        Overwrite: overwrite ? 'T' : 'F',
       };
-      
+
       const response = await this.request('MOVE', normalizedSource, {
         headers,
       });
-      
+
       if (response.status >= 400) {
         this.handleResponseError(response.status, normalizedSource);
       }
-      
+
       return {
         success: response.status >= 200 && response.status < 300,
         statusCode: response.status,
@@ -772,7 +785,11 @@ export class WebDAVFS implements WebDAVFileSystem {
       if (error instanceof WebDAVError) {
         throw error;
       }
-      throw new WebDAVError(`移动失败: ${normalizedSource} -> ${normalizedDestination}`, undefined, error);
+      throw new WebDAVError(
+        `移动失败: ${normalizedSource} -> ${normalizedDestination}`,
+        undefined,
+        error,
+      );
     }
   }
 

@@ -1,13 +1,13 @@
 /**
  * 集成测试
- * 
+ *
  * 注意：这些测试需要一个真实的WebDAV服务器才能运行。
  * 你可以使用以下方式设置测试环境变量：
- * 
+ *
  * WEBDAV_TEST_URL=https://your-webdav-server.com/webdav
  * WEBDAV_TEST_USERNAME=your-username
  * WEBDAV_TEST_PASSWORD=your-password
- * 
+ *
  * 如果没有设置这些环境变量，测试将被跳过。
  */
 
@@ -29,9 +29,8 @@ const testDir = `/${testDirName}`;
 // 创建WebDAVFS实例
 const webdavFs = new WebDAVFS({
   baseUrl: testUrl || 'https://example.com',
-  auth: testUsername && testPassword
-    ? { username: testUsername, password: testPassword }
-    : undefined,
+  auth:
+    testUsername && testPassword ? { username: testUsername, password: testPassword } : undefined,
 });
 
 // 在所有测试开始前创建测试目录
@@ -184,26 +183,18 @@ describe('WebDAVFS Integration Tests', () => {
     const nonExistentFile = `${testDir}/non-existent.txt`;
 
     // 尝试读取不存在的文件
-    await expect(webdavFs.readFile(nonExistentFile))
-      .rejects
-      .toThrow(WebDAVError);
+    await expect(webdavFs.readFile(nonExistentFile)).rejects.toThrow(WebDAVError);
 
     // 尝试获取不存在的文件的信息
-    await expect(webdavFs.stat(nonExistentFile))
-      .rejects
-      .toThrow(WebDAVError);
+    await expect(webdavFs.stat(nonExistentFile)).rejects.toThrow(WebDAVError);
 
     // 尝试删除不存在的文件
-    await expect(webdavFs.deleteFile(nonExistentFile))
-      .rejects
-      .toThrow(WebDAVError);
+    await expect(webdavFs.deleteFile(nonExistentFile)).rejects.toThrow(WebDAVError);
 
     // 尝试创建已存在的目录
     const dirPath = `${testDir}/existing-dir`;
     await webdavFs.mkdir(dirPath);
-    await expect(webdavFs.mkdir(dirPath))
-      .rejects
-      .toThrow(WebDAVError);
+    await expect(webdavFs.mkdir(dirPath)).rejects.toThrow(WebDAVError);
 
     // 清理
     await webdavFs.rmdir(dirPath, { force: true });
@@ -248,4 +239,3 @@ describe('WebDAVFS Integration Tests', () => {
     await webdavFs.deleteFile(specialFileName);
   });
 });
-

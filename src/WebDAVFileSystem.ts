@@ -13,8 +13,8 @@ export interface WebDAVFileSystem {
   deleteFile(path: string): Promise<WebDAVResult>;
   readDir(path: string, options?: ReaddirOptions): Promise<Stats[]>;
   mkdir(path: string, options?: MkdirOptions): Promise<void>;
-  rm(path: string, options?: { recursive?: boolean, force?: boolean }): Promise<void>;
-  rmdir(path: string, options?: boolean | { recursive?: boolean, force?: boolean }): Promise<void>;
+  rm(path: string, options?: { recursive?: boolean; force?: boolean }): Promise<void>;
+  rmdir(path: string, options?: boolean | { recursive?: boolean; force?: boolean }): Promise<void>;
   stat(path: string): Promise<Stats>;
   exists(path: string): Promise<boolean>;
   copy(source: string, destination: string, overwrite?: boolean): Promise<WebDAVResult>;

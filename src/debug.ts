@@ -53,7 +53,7 @@ export function disableDebug(): void {
  * @returns 模块名数组
  */
 export function listDebugModulesNames(): string[] {
-  return listDebugModules();
+  return listDebugModules().map(m => m.module);
 }
 
 // 创建底层 logger（内部同样受包的开关控制，此处再包一层双保险）
