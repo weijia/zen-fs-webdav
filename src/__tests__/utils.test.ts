@@ -56,9 +56,15 @@ describe('Utils', () => {
       expect(joinUrl('http://a.com/', '', '/b', '', 'c')).toBe('http://a.com/b/c');
       expect(joinUrl('http://a.com/', '', '', '')).toBe('http://a.com/');
       // 新增：base带路径时，paths中重复路径部分会被去除
-      expect(joinUrl('http://a.com/webdav', '/webdav/file.txt')).toBe('http://a.com/webdav/file.txt');
-      expect(joinUrl('http://a.com/webdav/', '/webdav/dir/', 'sub')).toBe('http://a.com/webdav/dir/sub');
-      expect(joinUrl('http://a.com/webdav', 'webdav/dir/file')).toBe('http://a.com/webdav/dir/file');
+      expect(joinUrl('http://a.com/webdav', '/webdav/file.txt')).toBe(
+        'http://a.com/webdav/file.txt',
+      );
+      expect(joinUrl('http://a.com/webdav/', '/webdav/dir/', 'sub')).toBe(
+        'http://a.com/webdav/dir/sub',
+      );
+      expect(joinUrl('http://a.com/webdav', 'webdav/dir/file')).toBe(
+        'http://a.com/webdav/dir/file',
+      );
       expect(joinUrl('http://a.com/webdav/', '/webdav/')).toBe('http://a.com/webdav/');
     });
   });
@@ -118,7 +124,14 @@ describe('Utils', () => {
 
   describe('propertiesToStats', () => {
     it('should convert properties to Stats', () => {
-      const stats = propertiesToStats('/file.txt', { resourceType: 'file', size: 123, createdAt: new Date(), lastModified: new Date(), mimeType: 'text/plain', etag: 'abc' });
+      const stats = propertiesToStats('/file.txt', {
+        resourceType: 'file',
+        size: 123,
+        createdAt: new Date(),
+        lastModified: new Date(),
+        mimeType: 'text/plain',
+        etag: 'abc',
+      });
       expect(stats.name).toBe('file.txt');
       expect(stats.isFile).toBe(true);
       expect(stats.size).toBe(123);
@@ -196,6 +209,7 @@ describe('Utils', () => {
       // Node.js 环境下补充 TextEncoder
       let encoder: unknown;
       if (typeof TextEncoder === 'undefined') {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         encoder = require('util').TextEncoder;
       } else {
         encoder = TextEncoder;

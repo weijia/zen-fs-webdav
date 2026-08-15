@@ -60,12 +60,12 @@ export enum WebDAVDepth {
    * 仅当前资源
    */
   ZERO = '0',
-  
+
   /**
    * 当前资源及其直接子资源
    */
   ONE = '1',
-  
+
   /**
    * 当前资源及其所有后代资源
    */
@@ -82,16 +82,16 @@ export const DEFAULT_TIMEOUT = 30000;
  */
 export const DEFAULT_HEADERS = {
   'Content-Type': 'application/xml; charset=utf-8',
-  'Accept': 'application/xml, */*',
+  Accept: 'application/xml, */*',
 };
 
 /**
  * XML 命名空间前缀
  */
 export const XML_NAMESPACE_PREFIX = {
-  'd': WebDAVNamespace.DAV,
-  'oc': WebDAVNamespace.OWNCLOUD,
-  'nc': WebDAVNamespace.NEXTCLOUD,
+  d: WebDAVNamespace.DAV,
+  oc: WebDAVNamespace.OWNCLOUD,
+  nc: WebDAVNamespace.NEXTCLOUD,
 };
 
 /**

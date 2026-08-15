@@ -31,7 +31,10 @@ export class WebDAVError extends Error {
     return `${this.name}: ${this.message}`;
   }
 
-  static fromResponse(response: { status: number; statusText: string }, message?: string): WebDAVError {
+  static fromResponse(
+    response: { status: number; statusText: string },
+    message?: string,
+  ): WebDAVError {
     const msg = message
       ? `${message}: ${response.status} ${response.statusText}`
       : `${response.status} ${response.statusText}`;

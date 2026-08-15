@@ -1,7 +1,7 @@
 import { WebDAVNamespace, WebDAVPropName, WebDAVResourceType } from './constants';
 import { Stats } from './types';
 import { WebDAVError } from './errors';
-import { XMLParser } from 'fast-xml-parser'
+import { XMLParser } from 'fast-xml-parser';
 
 /**
  * 规范化路径，确保以 / 开头，不以 / 结尾（除非是根路径）
@@ -30,17 +30,17 @@ export function normalizePath(path: string): string {
 //  */
 // export function joinPaths(base: string, ...paths: string[]): string {
 //   let result = base;
-  
+
 //   for (const path of paths) {
 //     if (!path) continue;
-    
+
 //     if (result.endsWith('/')) {
 //       result = result + (path.startsWith('/') ? path.slice(1) : path);
 //     } else {
 //       result = result + (path.startsWith('/') ? path : '/' + path);
 //     }
 //   }
-  
+
 //   return normalizePath(result);
 // }
 
@@ -51,17 +51,17 @@ export function normalizePath(path: string): string {
  */
 export function getParentPath(path: string): string {
   path = normalizePath(path);
-  
+
   // 根路径没有父目录
   if (path === '/') {
     return '/';
   }
-  
+
   const lastSlashIndex = path.lastIndexOf('/');
   if (lastSlashIndex <= 0) {
     return '/';
   }
-  
+
   return path.slice(0, lastSlashIndex) || '/';
 }
 
@@ -72,12 +72,12 @@ export function getParentPath(path: string): string {
  */
 export function getBasename(path: string): string {
   path = normalizePath(path);
-  
+
   // 根路径的基本名称为空字符串
   if (path === '/') {
     return '';
   }
-  
+
   const lastSlashIndex = path.lastIndexOf('/');
   return path.slice(lastSlashIndex + 1);
 }
@@ -99,7 +99,7 @@ export function createBasicAuthHeader(username: string, password: string): strin
       throw new Error('Base64 encoding not available');
     }
   };
-  
+
   return `Basic ${btoa(`${username}:${password}`)}`;
 }
 
@@ -110,22 +110,22 @@ export function createBasicAuthHeader(username: string, password: string): strin
  */
 export function parseWebDAVProperties(xml: Document): Record<string, any> {
   const result: Record<string, any> = {};
-  
+
   // 查找所有 prop 元素
   const propElements = xml.getElementsByTagNameNS(WebDAVNamespace.DAV, 'prop');
-  
+
   for (let i = 0; i < propElements.length; i++) {
     const propElement = propElements[i];
-    
+
     // 遍历 prop 元素的子元素
     for (let j = 0; j < propElement.childNodes.length; j++) {
       const childNode = propElement.childNodes[j];
-      
+
       if (childNode.nodeType === Node.ELEMENT_NODE) {
         const element = childNode as Element;
         const localName = element.localName;
         const namespace = element.namespaceURI;
-        
+
         // 根据属性类型进行特殊处理
         if (localName === WebDAVPropName.RESOURCE_TYPE) {
           // 资源类型
@@ -160,7 +160,7 @@ export function parseWebDAVProperties(xml: Document): Record<string, any> {
       }
     }
   }
-  
+
   return result;
 }
 
@@ -181,21 +181,21 @@ export function parseMultiStatus(xml: Document): Array<{
     statusCode?: number;
     properties: Record<string, any>;
   }> = [];
-  
+
   // 查找所有 response 元素
   const responseElements = xml.getElementsByTagNameNS(WebDAVNamespace.DAV, 'response');
-  
+
   for (let i = 0; i < responseElements.length; i++) {
     const responseElement = responseElements[i];
-    
+
     // 获取 href
     const hrefElement = responseElement.getElementsByTagNameNS(WebDAVNamespace.DAV, 'href')[0];
     const href = hrefElement ? decodeURIComponent(hrefElement.textContent || '') : '';
-    
+
     // 获取状态
     const statusElement = responseElement.getElementsByTagNameNS(WebDAVNamespace.DAV, 'status')[0];
     const status = statusElement ? statusElement.textContent || '' : undefined;
-    
+
     // 解析状态码
     let statusCode: number | undefined;
     if (status) {
@@ -204,10 +204,10 @@ export function parseMultiStatus(xml: Document): Array<{
         statusCode = parseInt(match[1], 10);
       }
     }
-    
+
     // 解析属性
     const properties = parseWebDAVProperties(responseElement as unknown as Document);
-    
+
     result.push({
       href,
       status,
@@ -215,7 +215,7 @@ export function parseMultiStatus(xml: Document): Array<{
       properties,
     });
   }
-  
+
   return result;
 }
 
@@ -234,7 +234,7 @@ export function createPropfindXml(props: string[] = []): string {
   } else {
     // 查询指定属性
     const propXml = props.map(prop => `<d:${prop}/>`).join('');
-    
+
     return `<?xml version="1.0" encoding="utf-8" ?>
 <d:propfind xmlns:d="${WebDAVNamespace.DAV}">
   <d:prop>
@@ -253,7 +253,7 @@ export function createProppatchXml(props: Record<string, string>): string {
   const propXml = Object.entries(props)
     .map(([key, value]) => `<d:${key}>${value}</d:${key}>`)
     .join('');
-  
+
   return `<?xml version="1.0" encoding="utf-8" ?>
 <d:propertyupdate xmlns:d="${WebDAVNamespace.DAV}">
   <d:set>
@@ -273,7 +273,7 @@ export function createProppatchXml(props: Record<string, string>): string {
 export function propertiesToStats(href: string, properties: Record<string, any>): Stats {
   const name = getBasename(href);
   const isDirectory = properties.resourceType === WebDAVResourceType.DIRECTORY;
-  
+
   return {
     isDirectory,
     isFile: !isDirectory,
@@ -302,6 +302,7 @@ export function parseXml(xmlString: string): Document {
     // Node.js 环境
     try {
       // 尝试使用 xmldom
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { DOMParser } = require('xmldom');
       return new DOMParser().parseFromString(xmlString, 'application/xml');
     } catch (error) {
@@ -333,10 +334,10 @@ export function extractPathFromUrl(url: string, baseUrl: string): string {
   if (url.startsWith(baseUrl)) {
     url = url.slice(baseUrl.length);
   }
-  
+
   // 解码 URL
   url = decodeURIComponent(url);
-  
+
   // 规范化路径
   return normalizePath(url);
 }
@@ -395,11 +396,11 @@ export async function toArrayBuffer(data: string | ArrayBuffer | Blob): Promise<
     if (typeof TextEncoder !== 'undefined') {
       return new TextEncoder().encode(data).buffer;
     } else if (typeof Buffer !== 'undefined') {
-        // Buffer.buffer may be a larger ArrayBuffer; create a new ArrayBuffer
-        // that exactly matches the Buffer contents to satisfy strict typing
-        const buf = Buffer.from(data);
-        // slice the underlying ArrayBuffer to the buffer's byte range
-        return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+      // Buffer.buffer may be a larger ArrayBuffer; create a new ArrayBuffer
+      // that exactly matches the Buffer contents to satisfy strict typing
+      const buf = Buffer.from(data);
+      // slice the underlying ArrayBuffer to the buffer's byte range
+      return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
     } else {
       throw new WebDAVError('无法将字符串转换为 ArrayBuffer');
     }
@@ -435,19 +436,34 @@ export function arrayBufferToString(buffer: ArrayBuffer, encoding = 'utf-8'): st
 export function getContentType(filename: string): string {
   const ext = filename.split('.').pop()?.toLowerCase();
   switch (ext) {
-    case 'txt': return 'text/plain';
-    case 'html': case 'htm': return 'text/html';
-    case 'json': return 'application/json';
-    case 'xml': return 'application/xml';
-    case 'jpg': case 'jpeg': return 'image/jpeg';
-    case 'png': return 'image/png';
-    case 'gif': return 'image/gif';
-    case 'pdf': return 'application/pdf';
-    case 'csv': return 'text/csv';
-    case 'js': return 'application/javascript';
-    case 'css': return 'text/css';
-    case 'zip': return 'application/zip';
-    default: return 'application/octet-stream';
+    case 'txt':
+      return 'text/plain';
+    case 'html':
+    case 'htm':
+      return 'text/html';
+    case 'json':
+      return 'application/json';
+    case 'xml':
+      return 'application/xml';
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'png':
+      return 'image/png';
+    case 'gif':
+      return 'image/gif';
+    case 'pdf':
+      return 'application/pdf';
+    case 'csv':
+      return 'text/csv';
+    case 'js':
+      return 'application/javascript';
+    case 'css':
+      return 'text/css';
+    case 'zip':
+      return 'application/zip';
+    default:
+      return 'application/octet-stream';
   }
 }
 
@@ -478,8 +494,8 @@ export function parseWebDAVXml(xml: string, basePath: string): Stats[] {
   if (!xml) return result;
   const parser = new XMLParser({
     ignoreAttributes: false,
-    attributeNamePrefix: "@_",
-    trimValues: true
+    attributeNamePrefix: '@_',
+    trimValues: true,
   });
   const json = parser.parse(xml);
   // 兼容不同大小写的 multistatus/response 属性
@@ -487,12 +503,13 @@ export function parseWebDAVXml(xml: string, basePath: string): Stats[] {
     if (!obj) return undefined;
     for (const key of keys) {
       // 直接匹配
-      if ((obj as Record<string, unknown>)[key] !== undefined) return (obj as Record<string, unknown>)[key];
-      
+      if ((obj as Record<string, unknown>)[key] !== undefined)
+        return (obj as Record<string, unknown>)[key];
+
       // 不区分大小写匹配
       const found = Object.keys(obj).find(k => k.toLowerCase() === key.toLowerCase());
       if (found) return (obj as Record<string, unknown>)[found];
-      
+
       // 匹配任意命名空间前缀的标签名（例如 resourcetype 匹配 lp1:resourcetype, d:resourcetype 等）
       const keyWithoutPrefix = key.includes(':') ? key.split(':').pop()! : key;
       const foundWithNamespace = Object.keys(obj).find(k => {
@@ -513,15 +530,20 @@ export function parseWebDAVXml(xml: string, basePath: string): Stats[] {
     const propstat = getCaseInsensitive(item, 'd:propstat', 'propstat', 'd:prop', 'prop') || {};
     const prop = getCaseInsensitive(propstat, 'd:prop', 'prop') || propstat;
     const resourcetype = getCaseInsensitive(prop, 'd:resourcetype', 'resourcetype');
-    const collection = resourcetype && getCaseInsensitive(resourcetype, 'd:collection', 'collection');
+    const collection =
+      resourcetype && getCaseInsensitive(resourcetype, 'd:collection', 'collection');
     const getcontentlength = getCaseInsensitive(prop, 'd:getcontentlength', 'getcontentlength');
-    
+
     // 判断是否为目录：
     // 1. resourcetype 中有 collection 元素 -> 目录
     // 2. 如果有 getcontentlength -> 文件（即使 href 以 / 结尾）
     // 3. 否则根据 href 是否以斜杠结尾判断（WebDAV 规范中目录通常以 / 结尾）
     // 注意：空的 resourcetype（如 <lp1:resourcetype/>）会被解析为空字符串或空对象
-    const hasCollection = !!(resourcetype && typeof resourcetype === 'object' && collection !== undefined);
+    const hasCollection = !!(
+      resourcetype &&
+      typeof resourcetype === 'object' &&
+      collection !== undefined
+    );
     const isDirectory = hasCollection || (!getcontentlength && href.endsWith('/'));
 
     // 规范化 href 与 basePath，然后尝试将 href 中的任意前缀（例如 /dav）对齐到 basePath
@@ -550,7 +572,10 @@ export function parseWebDAVXml(xml: string, basePath: string): Stats[] {
       name,
       isDirectory,
       isFile: !isDirectory,
-      size: parseInt(String(getCaseInsensitive(prop, 'd:getcontentlength', 'getcontentlength') ?? '0'), 10),
+      size: parseInt(
+        String(getCaseInsensitive(prop, 'd:getcontentlength', 'getcontentlength') ?? '0'),
+        10,
+      ),
       lastModified: getCaseInsensitive(prop, 'd:getlastmodified', 'getlastmodified')
         ? new Date(String(getCaseInsensitive(prop, 'd:getlastmodified', 'getlastmodified')))
         : undefined,

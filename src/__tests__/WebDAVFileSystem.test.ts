@@ -22,18 +22,18 @@ global.DOMParser = MockDOMParser as unknown as typeof DOMParser;
 
 describe('WebDAVFileSystem', () => {
   let fs: ReturnType<typeof createWebDAVFileSystem>;
-  
+
   beforeEach(() => {
     // 重置所有模拟
     jest.resetAllMocks();
-    
+
     // 创建 WebDAVFileSystem 实例
     fs = createWebDAVFileSystem({
       baseUrl: 'https://example.com/webdav',
       username: 'user',
       password: 'pass',
     });
-    
+
     // 模拟 fetch 成功响应
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
@@ -52,24 +52,24 @@ describe('WebDAVFileSystem', () => {
         username: 'user',
         password: 'pass',
       });
-      
+
       expect(fs).toBeInstanceOf(Object);
     });
-    
+
     it('should create instance with token auth', () => {
       const fs = createWebDAVFileSystem({
         baseUrl: 'https://example.com/webdav',
         token: 'my-token',
       });
-      
+
       expect(fs).toBeInstanceOf(Object);
     });
-    
+
     it('should create instance without auth', () => {
       const fs = createWebDAVFileSystem({
         baseUrl: 'https://example.com/webdav',
       });
-      
+
       expect(fs).toBeInstanceOf(Object);
     });
   });
@@ -80,12 +80,16 @@ describe('WebDAVFileSystem', () => {
         ok: true,
         status: 200,
         headers: { forEach: jest.fn() },
-        text: jest.fn().mockResolvedValue('<d:multistatus xmlns:d="DAV:"><d:response><d:href>/file.txt</d:href></d:response></d:multistatus>'),
+        text: jest
+          .fn()
+          .mockResolvedValue(
+            '<d:multistatus xmlns:d="DAV:"><d:response><d:href>/file.txt</d:href></d:response></d:multistatus>',
+          ),
         arrayBuffer: jest.fn(),
         body: new ReadableStream(),
       });
       const result = await fs.exists('/file.txt');
-      
+
       expect(result).toBe(true);
       // 只断言 method/headers/body/credentials 字段存在即可，避免 signal 对象引用不一致导致的误报
       expect(global.fetch).toHaveBeenCalledWith(
@@ -99,10 +103,10 @@ describe('WebDAVFileSystem', () => {
           }),
           credentials: 'include',
           body: undefined,
-        })
+        }),
       );
     });
-    
+
     it('should return false when file does not exist', async () => {
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: false,
@@ -112,27 +116,27 @@ describe('WebDAVFileSystem', () => {
         arrayBuffer: jest.fn(),
         body: new ReadableStream(),
       });
-      
+
       const result = await fs.exists('/not-found.txt');
-      
+
       expect(result).toBe(false);
     });
   });
 
   describe('readFile', () => {
     it('should read file as text', async () => {
-	  // 将 Buffer 转换为 ArrayBuffer
-	  const mockText = 'file content';
-	  // Node.js 环境下创建 ArrayBuffer
-	  const buffer = Buffer.from(mockText, 'utf-8');
-	  const mockArrayBuffer = buffer.buffer.slice(
-		buffer.byteOffset,
-		buffer.byteOffset + buffer.byteLength
-	  );
+      // 将 Buffer 转换为 ArrayBuffer
+      const mockText = 'file content';
+      // Node.js 环境下创建 ArrayBuffer
+      const buffer = Buffer.from(mockText, 'utf-8');
+      const mockArrayBuffer = buffer.buffer.slice(
+        buffer.byteOffset,
+        buffer.byteOffset + buffer.byteLength,
+      );
       console.log('Mock buffer content:', mockArrayBuffer);
       console.log('Mock buffer type:', typeof mockArrayBuffer);
       console.log('Mock buffer instanceof Buffer:', mockArrayBuffer instanceof Buffer);
-      
+
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
         status: 200,
@@ -141,22 +145,22 @@ describe('WebDAVFileSystem', () => {
         headers: { forEach: jest.fn() },
         body: new ReadableStream(),
       });
-      
+
       console.log('Calling fs.readFile...');
       const content = await fs.readFile('/file.txt', { encoding: 'utf-8' });
-      
+
       console.log('Actual content:', content);
       console.log('Expected content:', 'file content');
       console.log('Content type:', typeof content);
       console.log('Content length:', content.length);
-      
+
       expect(content).toBe('file content');
       expect(global.fetch).toHaveBeenCalledWith(
         'https://example.com/webdav/file.txt',
-        expect.objectContaining({ method: 'GET' })
+        expect.objectContaining({ method: 'GET' }),
       );
     });
-    
+
     it('should read file as arraybuffer', async () => {
       const buffer = new ArrayBuffer(10);
       (global.fetch as jest.Mock).mockResolvedValue({
@@ -167,9 +171,9 @@ describe('WebDAVFileSystem', () => {
         headers: { forEach: jest.fn() },
         body: new ReadableStream(),
       });
-      
+
       const content = await fs.readFile('/file.bin', { responseType: 'arraybuffer' });
-      
+
       // 兼容 Buffer/ArrayBuffer 返回类型
       if (content instanceof ArrayBuffer) {
         expect(content).toBe(buffer);
@@ -179,14 +183,14 @@ describe('WebDAVFileSystem', () => {
         throw new Error('Unexpected content type');
       }
     });
-    
+
     it('should throw error when file does not exist', async () => {
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: false,
         status: 404,
         headers: { forEach: jest.fn() }, // 添加 headers mock
       });
-      
+
       await expect(fs.readFile('/not-found.txt')).rejects.toThrow(WebDAVError);
     });
   });
@@ -194,27 +198,27 @@ describe('WebDAVFileSystem', () => {
   describe('writeFile', () => {
     it('should write text content to file', async () => {
       await fs.writeFile('/file.txt', 'new content');
-      
+
       expect(global.fetch).toHaveBeenCalledWith(
         'https://example.com/webdav/file.txt',
         expect.objectContaining({
           method: 'PUT',
           body: 'new content',
-        })
+        }),
       );
     });
-    
+
     it('should write binary content to file', async () => {
       const buffer = new ArrayBuffer(10);
       const nodeBuffer = Buffer.from(buffer);
       await fs.writeFile('/file.bin', nodeBuffer);
-      
+
       expect(global.fetch).toHaveBeenCalledWith(
         'https://example.com/webdav/file.bin',
         expect.objectContaining({
           method: 'PUT',
           body: nodeBuffer,
-        })
+        }),
       );
     });
   });
@@ -222,10 +226,10 @@ describe('WebDAVFileSystem', () => {
   describe('mkdir', () => {
     it('should create directory', async () => {
       await fs.mkdir('/new-dir');
-      
+
       expect(global.fetch).toHaveBeenCalledWith(
         'https://example.com/webdav/new-dir',
-        expect.objectContaining({ method: 'MKCOL' })
+        expect.objectContaining({ method: 'MKCOL' }),
       );
     });
   });
@@ -239,10 +243,10 @@ describe('WebDAVFileSystem', () => {
         // ...其他属性可省略...
       } as any);
       await fs.unlink('/file.txt');
-      
+
       expect(global.fetch).toHaveBeenCalledWith(
         'https://example.com/webdav/file.txt',
-        expect.objectContaining({ method: 'DELETE' })
+        expect.objectContaining({ method: 'DELETE' }),
       );
     });
   });
@@ -258,10 +262,10 @@ describe('WebDAVFileSystem', () => {
       // mock readDir 返回空数组，表示目录为空
       fs.readDir = jest.fn().mockResolvedValue([]);
       await fs.rmdir('/dir');
-      
+
       expect(global.fetch).toHaveBeenCalledWith(
         'https://example.com/webdav/dir',
-        expect.objectContaining({ method: 'DELETE' })
+        expect.objectContaining({ method: 'DELETE' }),
       );
     });
   });
@@ -274,15 +278,15 @@ describe('WebDAVFileSystem', () => {
         isFile: true,
       } as any);
       await fs.copy('/source.txt', '/dest.txt');
-      
+
       expect(global.fetch).toHaveBeenCalledWith(
         'https://example.com/webdav/source.txt',
         expect.objectContaining({
           method: 'COPY',
           headers: expect.objectContaining({
-            'Destination': 'https://example.com/webdav/dest.txt',
+            Destination: 'https://example.com/webdav/dest.txt',
           }),
-        })
+        }),
       );
     });
   });
@@ -295,15 +299,15 @@ describe('WebDAVFileSystem', () => {
         isFile: true,
       } as any);
       await fs.move('/source.txt', '/dest.txt');
-      
+
       expect(global.fetch).toHaveBeenCalledWith(
         'https://example.com/webdav/source.txt',
         expect.objectContaining({
           method: 'MOVE',
           headers: expect.objectContaining({
-            'Destination': 'https://example.com/webdav/dest.txt',
+            Destination: 'https://example.com/webdav/dest.txt',
           }),
-        })
+        }),
       );
     });
   });
@@ -318,10 +322,10 @@ describe('WebDAVFileSystem', () => {
         arrayBuffer: jest.fn(),
         body: new ReadableStream(),
       });
-      
+
       await expect(fs.readFile('/file.txt')).rejects.toThrow('认证失败');
     });
-    
+
     it('should handle permission error', async () => {
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: false,
@@ -331,7 +335,7 @@ describe('WebDAVFileSystem', () => {
         arrayBuffer: jest.fn(),
         body: new ReadableStream(),
       });
-      
+
       await expect(fs.readFile('/file.txt')).rejects.toThrow('无权限访问');
     });
     it('should handle not found error', async () => {
@@ -343,13 +347,13 @@ describe('WebDAVFileSystem', () => {
         arrayBuffer: jest.fn(),
         body: new ReadableStream(),
       });
-      
+
       await expect(fs.readFile('/file.txt')).rejects.toThrow('文件未找到');
     });
-    
+
     it('should handle network error', async () => {
       (global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
-      
+
       await expect(fs.readFile('/file.txt')).rejects.toThrow('网络错误');
     });
   });
