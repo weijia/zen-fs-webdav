@@ -731,21 +731,16 @@
   resolved "https://registry.npmjs.org/@pkgjs/parseargs/-/parseargs-0.11.0.tgz"
   integrity sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==
 
-<<<<<<< HEAD
-=======
 "@pkgr/core@^0.3.6":
   version "0.3.6"
   resolved "https://registry.npmjs.org/@pkgr/core/-/core-0.3.6.tgz"
   integrity sha512-SEeaJLb3qBNF/OaXnaR1NmmBbFYk1zC0ZH/52fATcRPLFg/p791YrcyFFy44Bo9sLaGuSuLp5Q6axbb/O+v/RA==
 
->>>>>>> 075812530926ed18f698744a29744a8c5bdb03fc
 "@richard432/localstorage-logger@^0.1.0":
   version "0.1.0"
   resolved "https://registry.npmjs.org/@richard432/localstorage-logger/-/localstorage-logger-0.1.0.tgz"
   integrity sha512-kTnXr/I27WKowzQV9S/j2mGLBIjX/LtTT3Y4RInD8GgrD90Syjx0h94HlFCnqi7ekUhRB6m3s0UB+4h5KgfnfQ==
 
-<<<<<<< HEAD
-=======
 "@rollup/rollup-android-arm-eabi@4.44.2":
   version "4.44.2"
   resolved "https://registry.npmjs.org/@rollup/rollup-android-arm-eabi/-/rollup-android-arm-eabi-4.44.2.tgz"
@@ -841,7 +836,6 @@
   resolved "https://registry.npmjs.org/@rollup/rollup-win32-ia32-msvc/-/rollup-win32-ia32-msvc-4.44.2.tgz"
   integrity sha512-+qMUrkbUurpE6DVRjiJCNGZBGo9xM4Y0FXU5cjgudWqIBWbcLkjE3XprJUsOFgC6xjBClwVa9k6O3A7K3vxb5Q==
 
->>>>>>> 075812530926ed18f698744a29744a8c5bdb03fc
 "@rollup/rollup-win32-x64-msvc@4.44.2":
   version "4.44.2"
   resolved "https://registry.npmjs.org/@rollup/rollup-win32-x64-msvc/-/rollup-win32-x64-msvc-4.44.2.tgz"
