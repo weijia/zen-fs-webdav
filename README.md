@@ -63,6 +63,24 @@ const fs = new WebDAVFileSystem(options);
 - `token`: 认证令牌（可选，用于令牌认证）
 - `headers`: 自定义请求头（可选）
 - `fetch`: 自定义 fetch 函数（可选）
+- `debug`: 布尔值（可选）。为 `true` 时在实例化时立即开启内部 HTTP 调试；也可在实例化后通过 `setDebugEnabled('zen-fs-webdav', true)` 动态开启。缺省关闭。
+
+#### 调试模式
+
+内部调试打印复用 `@richard432/localstorage-logger`，所有 WebDAV 请求/响应（PROPFIND / GET / PUT / DELETE 等，Authorization 头已隐藏）会按模块 `zen-fs-webdav` 写入 `localStorage`。
+
+```typescript
+import { WebDAVFileSystem, setDebugEnabled, isDebugEnabled } from 'zen-fs-webdav';
+
+// 方式 1：构造时开启
+const fs = createWebDAVFileSystem({ baseUrl, username, password, debug: true });
+
+// 方式 2：运行时动态开启 / 查询
+setDebugEnabled('zen-fs-webdav', true);
+console.log(isDebugEnabled('zen-fs-webdav')); // true
+```
+
+> 调试**缺省关闭**：模块加载时会把 `zen-fs-webdav` 的开关写入 `false`，即使 `localstorage-logger` 默认是开启的。只有显式传入 `debug: true` 或调用 `setDebugEnabled('zen-fs-webdav', true)` 才会输出。开关状态保存在 `localStorage` 的 `debug:zen-fs-webdav` 键，跨模块/跨页面共享。
 
 ### 文件操作
 

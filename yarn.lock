@@ -606,6 +606,11 @@
   resolved "https://registry.npmjs.org/@pkgjs/parseargs/-/parseargs-0.11.0.tgz"
   integrity sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==
 
+"@richard432/localstorage-logger@^0.1.0":
+  version "0.1.0"
+  resolved "https://registry.npmjs.org/@richard432/localstorage-logger/-/localstorage-logger-0.1.0.tgz"
+  integrity sha512-kTnXr/I27WKowzQV9S/j2mGLBIjX/LtTT3Y4RInD8GgrD90Syjx0h94HlFCnqi7ekUhRB6m3s0UB+4h5KgfnfQ==
+
 "@rollup/rollup-win32-x64-msvc@4.44.2":
   version "4.44.2"
   resolved "https://registry.npmjs.org/@rollup/rollup-win32-x64-msvc/-/rollup-win32-x64-msvc-4.44.2.tgz"

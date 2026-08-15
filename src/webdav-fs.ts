@@ -102,8 +102,8 @@ export class WebDAVFS implements WebDAVFileSystem {
     this.headers = options.headers || {};
     this.httpClient = (options as any).httpClient;
 
-    // 调试开关：实例化时若传 options.debug=true 立即开启
-    if (options.debug) {
+    // 调试开关：实例化时若传 options.debug=true，或外部已通过 localStorage/setDebugEnabled 开启（debug:zen-fs-webdav=1），则立即启用
+    if (options.debug || debugEnabled()) {
       enableDebug();
     }
     debugLog(`[WebDAVFS] 实例化 baseUrl=${this.baseUrl} debug=${debugEnabled()}`);
