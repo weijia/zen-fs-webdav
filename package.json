@@ -1,6 +1,6 @@
 {
   "name": "zen-fs-webdav",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "一个简单、现代的 WebDAV 客户端库，提供类似文件系统的 API",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -54,7 +54,8 @@
     "rimraf": "^5.0.0",
     "ts-jest": "^29.1.0",
     "tsup": "^8.5.0",
-    "typescript": "^5.0.4"
+    "typescript": "^5.0.4",
+    "zen-fs-sync": "^0.4.10"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -62,7 +63,6 @@
   "dependencies": {
     "@richard432/localstorage-logger": "^0.1.0",
     "fast-xml-parser": "^5.2.5",
-    "he": "^1.2.0",
-    "zen-fs-sync": "file:../zen-fs-sync"
+    "he": "^1.2.0"
   }
 }

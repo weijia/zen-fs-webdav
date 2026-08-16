@@ -44,10 +44,10 @@ function makeFs(): SyncableWebDAVFS {
 
 // 兼容本地 isFile / isDirectory 判断（与 zen-fs-sync 一致）
 function isFile(stat: FileStat): boolean {
-  return (stat.mode & 0o170000) === 0o100000;
+  return (stat.mode! & 0o170000) === 0o100000;
 }
 function isDirectory(stat: FileStat): boolean {
-  return (stat.mode & 0o170000) === 0o040000;
+  return (stat.mode! & 0o170000) === 0o040000;
 }
 
 // ---------------------------------------------------------------------------
@@ -59,12 +59,11 @@ describe('SyncableWebDAVFS interface shape', () => {
   const requiredMethods: (keyof SyncableFS)[] = [
     'readFile',
     'writeFile',
-    'deleteFile',
+    'unlink',
     'readdir',
     'mkdir',
     'stat',
     'exists',
-    'rename',
   ];
 
   it('backendName should be "webdav"', () => {
@@ -93,10 +92,11 @@ describe('SyncableWebDAVFS interface shape', () => {
 // ---------------------------------------------------------------------------
 
 conditionalDescribe('SyncableWebDAVFS SyncableFS contract (live server)', () => {
-  const fs = makeFs();
+  let fs: SyncableWebDAVFS;
   const root = `/syncable-compat-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
   beforeAll(async () => {
+    fs = makeFs();
     await fs.mkdir(root, { recursive: true });
   });
 
@@ -107,12 +107,12 @@ conditionalDescribe('SyncableWebDAVFS SyncableFS contract (live server)', () => 
         const p = `${root}/${e}`;
         const st = await fs.stat(p);
         if (isDirectory(st)) {
-          await fs.deleteFile(`${p}/${e}.mtime`).catch(() => {});
+          await fs.unlink(`${p}/${e}.mtime`).catch(() => undefined);
         } else {
-          await fs.deleteFile(p);
+          await fs.unlink(p);
         }
       }
-      await fs.deleteFile(root).catch(() => {});
+      await fs.unlink(root).catch(() => undefined);
     } catch {
       /* ignore */
     }
@@ -122,7 +122,7 @@ conditionalDescribe('SyncableWebDAVFS SyncableFS contract (live server)', () => 
     const path = `${root}/hello.txt`;
     await fs.writeFile(path, 'hello webdav sync');
     const content = await fs.readFile(path);
-    expect(content).toBe('hello webdav sync');
+    expect(content.toString()).toBe('hello webdav sync');
   });
 
   it('writeFile accepts Uint8Array', async () => {
@@ -130,7 +130,7 @@ conditionalDescribe('SyncableWebDAVFS SyncableFS contract (live server)', () => 
     const data = new Uint8Array([1, 2, 3, 4]);
     await fs.writeFile(path, data);
     const read = await fs.readFile(path);
-    expect(read).toBeInstanceOf(Uint8Array);
+    expect(Buffer.isBuffer(read) || read instanceof Uint8Array).toBe(true);
     expect(Array.from(read as Uint8Array)).toEqual([1, 2, 3, 4]);
   });
 
@@ -151,7 +151,7 @@ conditionalDescribe('SyncableWebDAVFS SyncableFS contract (live server)', () => 
   it('readdir lists only real files (no .mtime sidecars)', async () => {
     const list = await fs.readdir(root);
     expect(list).toContain('hello.txt');
-    expect(list.some((n) => n.endsWith('.mtime'))).toBe(false);
+    expect(list.some(n => n.endsWith('.mtime'))).toBe(false);
   });
 
   it('rename moves file and preserves accessibility', async () => {
@@ -161,7 +161,7 @@ conditionalDescribe('SyncableWebDAVFS SyncableFS contract (live server)', () => 
     await fs.rename(from, to);
     expect(await fs.exists(from)).toBe(false);
     expect(await fs.exists(to)).toBe(true);
-    expect(await fs.readFile(to)).toBe('x');
+    expect((await fs.readFile(to)).toString()).toBe('x');
   });
 
   it('writeFileWithMtime preserves exact mtime (via .mtime sidecar)', async () => {
@@ -177,17 +177,17 @@ conditionalDescribe('SyncableWebDAVFS SyncableFS contract (live server)', () => 
     expect(typeof result).toBe('boolean');
   });
 
-  it('createSnapshot returns Record<path, FileStat> including written files', async () => {
+  it('createSnapshot returns Map<path, FileSnapshot> including written files', async () => {
     const snapshot = await fs.createSnapshot(root);
-    expect(typeof snapshot).toBe('object');
-    const paths = Object.keys(snapshot);
-    expect(paths.some((p) => p.endsWith('/hello.txt'))).toBe(true);
+    expect(snapshot).toBeInstanceOf(Map);
+    const paths = Array.from(snapshot!.keys());
+    expect(paths.some(p => p.endsWith('/hello.txt'))).toBe(true);
     // sidecar 不应出现在快照中
-    expect(paths.some((p) => p.endsWith('.mtime'))).toBe(false);
-    // 每个条目都是合法 FileStat
-    for (const p of paths) {
-      const s = snapshot[p];
-      expect(typeof s.mode).toBe('number');
+    expect(paths.some(p => p.endsWith('.mtime'))).toBe(false);
+    // 每个条目都是合法 FileSnapshot
+    for (const [, s] of snapshot!) {
+      expect(typeof s.path).toBe('string');
+      expect(typeof s.size).toBe('number');
       expect(typeof s.mtimeMs).toBe('number');
     }
   });

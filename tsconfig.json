@@ -11,10 +11,7 @@
     "forceConsistentCasingInFileNames": true,
     "lib": ["DOM", "ES2018", "ESNext.AsyncIterable"],
     "sourceMap": true,
-    "baseUrl": ".",
-    "paths": {
-      "zen-fs-sync": ["../zen-fs-sync/src/index.ts"]
-    }
+    "baseUrl": "."
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "**/__tests__/**"]

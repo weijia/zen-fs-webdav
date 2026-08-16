@@ -18,15 +18,10 @@
  */
 
 import { WebDAVFS } from './webdav-fs';
-import {
-  WebDAVOptions,
-  Stats,
-} from './types';
+import { WebDAVOptions, Stats } from './types';
 import { normalizePath } from './utils';
 
-// 通过本地 / 已发布依赖引用 zen-fs-sync 的 SyncableFS 类型。
-// 类型导出失败时（例如未安装依赖），使用下方的内嵌最小结构声明作为回退，
-// 保证本项目仍可独立编译（类型擦除，运行时不依赖 zen-fs-sync）。
+// zen-fs-sync 仅用于类型（import type），运行时不依赖。
 import type { SyncableFS, FileStat, FileSnapshot } from 'zen-fs-sync';
 
 // --------------------------------------------------------------------------
@@ -53,16 +48,12 @@ const S_IFDIR = 0o040000; // 目录
  */
 function toFileStat(stat: Stats): FileStat {
   const isDirectory = stat.isDirectory;
-  const mtimeMs = stat.lastModified
-    ? stat.lastModified.getTime()
-    : Date.now();
+  const mtimeMs = stat.lastModified ? stat.lastModified.getTime() : Date.now();
 
   return {
-    path: stat.path,
     mode: isDirectory ? S_IFDIR : S_IFREG,
     size: stat.size,
     mtimeMs,
-    ctimeMs: mtimeMs,
   };
 }
 
@@ -108,16 +99,21 @@ export class SyncableWebDAVFS implements SyncableFS {
   // 必需方法
   // ------------------------------------------------------------------------
 
-  async readFile(path: string): Promise<string | Uint8Array> {
+  readFile(path: string, encoding: BufferEncoding): Promise<string>;
+  readFile(path: string): Promise<Buffer>;
+  async readFile(path: string, _encoding?: BufferEncoding): Promise<string | Buffer> {
     const data = await this.fs.readFile(path);
     if (typeof data === 'string') {
       return data;
     }
     // Buffer -> Uint8Array（浏览器安全）
     if (typeof Buffer !== 'undefined' && Buffer.isBuffer(data)) {
-      return new Uint8Array(data);
+      return data;
     }
-    return data as unknown as Uint8Array;
+    if (typeof Buffer !== 'undefined') {
+      return Buffer.from(data);
+    }
+    return data as unknown as Buffer;
   }
 
   async writeFile(path: string, data: string | Uint8Array): Promise<void> {
@@ -127,15 +123,13 @@ export class SyncableWebDAVFS implements SyncableFS {
     }
   }
 
-  async deleteFile(path: string): Promise<void> {
+  async unlink(path: string): Promise<void> {
     await this.fs.unlink(path);
   }
 
   async readdir(path: string): Promise<string[]> {
     const entries = await this.fs.readDir(path, { includeHidden: true });
-    return entries
-      .filter(entry => !isMtimeSidecar(entry.name))
-      .map(entry => entry.name);
+    return entries.filter(entry => !isMtimeSidecar(entry.name)).map(entry => entry.name);
   }
 
   async mkdir(path: string, options?: { recursive?: boolean }): Promise<void> {
@@ -157,7 +151,6 @@ export class SyncableWebDAVFS implements SyncableFS {
       const mtimeMs = Number(raw.trim());
       if (Number.isFinite(mtimeMs) && mtimeMs > 0) {
         stat.mtimeMs = mtimeMs;
-        stat.ctimeMs = mtimeMs;
       }
     } catch {
       // 无 sidecar —— 使用服务端 stat 的 mtime
@@ -245,34 +238,42 @@ export class SyncableWebDAVFS implements SyncableFS {
    * 通过一次 PROPFIND（Depth=infinity）批量获取整个目录树的快照。
    *
    * 比逐个 stat 高效得多，适合远程后端。sidecar 文件会被过滤掉。
+   * 返回 Map<相对路径, FileSnapshot>（与 zen-fs-sync 的 createSnapshot 签名一致）。
    */
-  async createSnapshot(rootPath = '/'): Promise<FileSnapshot> {
-    const normalizedRoot = normalizePath(rootPath);
-    const entries = await this.fs.readDir(normalizedRoot, {
-      recursive: true,
-      includeHidden: true,
-    });
+  async createSnapshot(rootPath = '/'): Promise<Map<string, FileSnapshot> | null> {
+    try {
+      const normalizedRoot = normalizePath(rootPath);
+      const entries = await this.fs.readDir(normalizedRoot, {
+        recursive: true,
+        includeHidden: true,
+      });
 
-    const snapshot: FileSnapshot = {};
-    for (const entry of entries) {
-      if (isMtimeSidecar(entry.path)) {
-        continue;
-      }
-      const stat = toFileStat(entry);
-      // 尝试读取 sidecar 以获得精确 mtime
-      try {
-        const sidecar = await this.fs.readFile(mtimeSidecarPathFor(entry.path));
-        const raw = typeof sidecar === 'string' ? sidecar : new TextDecoder().decode(sidecar);
-        const mtimeMs = Number(raw.trim());
-        if (Number.isFinite(mtimeMs) && mtimeMs > 0) {
-          stat.mtimeMs = mtimeMs;
-          stat.ctimeMs = mtimeMs;
+      const snapshot = new Map<string, FileSnapshot>();
+      for (const entry of entries) {
+        if (isMtimeSidecar(entry.path)) {
+          continue;
         }
-      } catch {
-        // 无 sidecar —— 使用服务端 mtime
+        const stat = toFileStat(entry);
+        // 尝试读取 sidecar 以获得精确 mtime
+        try {
+          const sidecar = await this.fs.readFile(mtimeSidecarPathFor(entry.path));
+          const raw = typeof sidecar === 'string' ? sidecar : new TextDecoder().decode(sidecar);
+          const mtimeMs = Number(raw.trim());
+          if (Number.isFinite(mtimeMs) && mtimeMs > 0) {
+            stat.mtimeMs = mtimeMs;
+          }
+        } catch {
+          // 无 sidecar —— 使用服务端 mtime
+        }
+        snapshot.set(entry.path, {
+          path: entry.path,
+          size: stat.size,
+          mtimeMs: stat.mtimeMs,
+        });
       }
-      snapshot[stat.path] = stat;
+      return snapshot;
+    } catch {
+      return null;
     }
-    return snapshot;
   }
 }
