@@ -1,6 +1,6 @@
 {
   "name": "zen-fs-webdav",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "一个简单、现代的 WebDAV 客户端库，提供类似文件系统的 API",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
