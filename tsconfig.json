@@ -10,7 +10,11 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "lib": ["DOM", "ES2018", "ESNext.AsyncIterable"],
-    "sourceMap": true
+    "sourceMap": true,
+    "baseUrl": ".",
+    "paths": {
+      "zen-fs-sync": ["../zen-fs-sync/src/index.ts"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "**/__tests__/**"]

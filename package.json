@@ -62,6 +62,7 @@
   "dependencies": {
     "@richard432/localstorage-logger": "^0.1.0",
     "fast-xml-parser": "^5.2.5",
-    "he": "^1.2.0"
+    "he": "^1.2.0",
+    "zen-fs-sync": "file:../zen-fs-sync"
   }
 }

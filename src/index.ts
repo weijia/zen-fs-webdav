@@ -39,3 +39,6 @@ export {
   listDebugModulesNames as listDebugModules,
   MODULE as DEBUG_MODULE,
 } from './debug';
+
+// 导出 zen-fs-sync 兼容适配器（SyncableFS 接口实现）
+export { SyncableWebDAVFS } from './syncable-webdav-fs';
